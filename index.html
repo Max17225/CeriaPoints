@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CeriaPoints</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="logo">☀️ CeriaPoints</h1>
+      <p class="subtitle">Tadika Matahari Ceria Recycling</p>
+
+      <div class="nav-buttons">
+        <button class="nav-btn" onclick="switchRole('userPage')">User</button>
+        <button class="nav-btn" onclick="switchRole('weigherPage')">
+          Weigher
+        </button>
+        <button class="nav-btn" onclick="switchRole('adminPage')">Admin</button>
+      </div>
+      <hr />
+
+      <div id="userPage" class="page" style="display: block">
+        <h2>User Dashboard</h2>
+        <div class="card">
+          <p>Welcome back!</p>
+          <h3>
+            Your Balance:
+            <span id="userPointsDisplay" class="points">0</span> pts
+          </h3>
+          <button
+            class="action-btn"
+            onclick="alert('Reward shop coming soon!')"
+          >
+            🎁 View Rewards
+          </button>
+        </div>
+      </div>
+
+      <div id="weigherPage" class="page" style="display: none">
+        <h2>Weigher Dashboard</h2>
+        <div class="card">
+          <h3>Step 1: Find User</h3>
+          <label>Enter Username (e.g., Ali):</label>
+          <div style="display: flex; gap: 10px">
+            <input
+              type="text"
+              id="usernameSearch"
+              placeholder="Enter exactly as in database"
+            />
+            <button
+              class="action-btn"
+              style="margin-top: 5px; width: auto"
+              onclick="searchUser()"
+            >
+              Search
+            </button>
+          </div>
+          <p
+            id="searchResult"
+            style="color: #f39c12; font-weight: bold; margin-top: 10px"
+          ></p>
+
+          <hr style="margin: 20px 0; border: 1px solid #eee" />
+
+          <div id="weighingForm" style="display: none">
+            <h3>Step 2: Weigh Items</h3>
+            <label>Material Type:</label>
+            <select id="materialSelect">
+              <option value="plastic">🥤 Plastic</option>
+              <option value="cardboard">📦 Cardboard</option>
+              <option value="aluminum">🥫 Aluminum</option>
+            </select>
+
+            <label>Weight (in KG):</label>
+            <input type="number" id="weightInput" placeholder="e.g., 2.5" />
+
+            <button class="action-btn" onclick="processWeighIn()">
+              ⚖️ Award Points
+            </button>
+            <p id="weigherMessage" class="success-msg"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminPage" class="page" style="display: none">
+        <h2>Admin Dashboard</h2>
+        <div class="card">
+          <p>Current Point Rates:</p>
+          <ul>
+            <li>Plastic: <strong>100</strong> pts/kg</li>
+            <li>Cardboard: <strong>50</strong> pts/kg</li>
+            <li>Aluminum: <strong>200</strong> pts/kg</li>
+          </ul>
+          <button
+            class="action-btn"
+            onclick="alert('Settings menu coming soon!')"
+          >
+            ⚙️ Edit Rates
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
