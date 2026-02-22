@@ -14,26 +14,84 @@
           alt="Tadika Matahari Ceria Logo"
           class="brand-logo"
         />
-
         <h1 class="brand-title">CeriaPoints</h1>
-
-        <blockquote class="auth-quote">
-          "Whatever is right, do it with unwavering determination, and see it
-          through to the end."
-          <span class="quote-author"
-            >— Jing Si Aphorisms by Master Cheng Yen</span
-          >
-        </blockquote>
+        <div class="feature-box">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 8v5a1 1 0 0 1-1 1H11.5" />
+                <path d="m15 11 3 3 3-3" />
+                <path d="M3 16v-5a1 1 0 0 1 1-1h8.5" />
+                <path d="m9 13-3-3-3 3" />
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h3>Earn Points</h3>
+              <p>Recycle materials to collect Points.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h3>View Leaderboard</h3>
+              <p>Track your real-world impact and rank.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                <rect x="2" y="7" width="20" height="5"></rect>
+                <line x1="12" y1="22" x2="12" y2="7"></line>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h3>Win Prizes</h3>
+              <p>Finish in the top 3 to earn exclusive rewards!</p>
+            </div>
+          </div>
+        </div>
       </div>
-
       <div class="auth-right">
         <div id="loginForm">
           <h2>Welcome Back</h2>
           <p class="form-subtext">Sign in to your CeriaPoints account.</p>
-          <label>Email Address</label>
-          <input type="email" id="loginEmail" placeholder="Enter your email" />
-          <label>Password</label>
-          <input
+          <label for="loginEmail">Email Address</label
+          ><input type="email" id="loginEmail" placeholder="Enter your email" />
+          <label for="loginPassword">Password</label
+          ><input
             type="password"
             id="loginPassword"
             placeholder="Enter your password"
@@ -48,12 +106,11 @@
             </p>
           </div>
         </div>
-
         <div id="forgotForm" style="display: none">
           <h2>Reset Password</h2>
           <p class="form-subtext">We'll send a recovery link to your email.</p>
-          <label>Email Address</label>
-          <input type="email" id="resetEmail" placeholder="Enter your email" />
+          <label for="resetEmail">Email Address</label
+          ><input type="email" id="resetEmail" placeholder="Enter your email" />
           <button class="action-btn" onclick="resetPassword()">
             Send Reset Link
           </button>
@@ -63,19 +120,26 @@
             </p>
           </div>
         </div>
-
         <div id="registerForm" style="display: none">
           <h2>Create Account</h2>
           <p class="form-subtext">Join our community recycling program.</p>
-          <label>Full Name</label>
-          <input type="text" id="regName" placeholder="e.g. Ali Bin Abu" />
-          <label>Email Address</label>
-          <input type="email" id="regEmail" placeholder="Enter your email" />
-          <label>Password</label>
-          <input
+          <label for="regName">Full Name</label
+          ><input
+            type="text"
+            id="regName"
+            placeholder="Enter your full name..."
+          />
+          <label for="regEmail">Email Address</label
+          ><input
+            type="email"
+            id="regEmail"
+            placeholder="Enter your email..."
+          />
+          <label for="regPassword">Password</label
+          ><input
             type="password"
             id="regPassword"
-            placeholder="Min 6 characters"
+            placeholder="Enter your password..."
           />
           <button class="action-btn" onclick="registerUser()">Register</button>
           <div class="auth-links">
@@ -88,125 +152,252 @@
     </div>
 
     <div id="appContainer" class="app-container">
-      <div class="app-header">
-        <h1 class="logo" style="font-size: 1.8em">CeriaPoints</h1>
-        <button class="logout-btn" onclick="logoutUser()">Log Out</button>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="nav-btn" id="navUser" onclick="switchRole('userPage')">
-          My Impact
-        </button>
-        <button
-          class="nav-btn"
-          id="navWeigher"
-          onclick="switchRole('weigherPage')"
-        >
-          Weigher Terminal
-        </button>
-        <button class="nav-btn" id="navAdmin" onclick="switchRole('adminPage')">
-          Admin Panel
-        </button>
-      </div>
-
-      <hr class="divider" />
-
-      <div id="userPage" class="page" style="display: none">
-        <div class="card main-points-card">
-          <p class="greeting">
-            Welcome,
-            <strong id="displayUserName" style="color: var(--primary-color)"
-              >User</strong
-            >
-          </p>
-          <h1 class="points-display"><span id="userPointsDisplay">0</span></h1>
-          <p class="subtitle" style="margin-bottom: 0">Total GreenPoints</p>
+      <div class="app-header-wrapper">
+        <div class="app-header">
+          <h1 class="logo" style="font-size: 1.8em">CeriaPoints</h1>
+          <button class="logout-btn" onclick="logoutUser()">Log Out</button>
         </div>
-
-        <h3 class="section-title">Lifetime Real-World Impact</h3>
-        <div class="impact-grid">
-          <div class="card impact-card">
-            <div id="treesSaved" class="impact-number">0.0</div>
-            <div class="impact-label">Trees<br />Saved</div>
-          </div>
-          <div class="card impact-card">
-            <div id="co2Saved" class="impact-number">0.0</div>
-            <div class="impact-label">Kg CO2<br />Prevented</div>
-          </div>
-          <div class="card impact-card">
-            <div id="energySaved" class="impact-number">0.0</div>
-            <div class="impact-label">kWh<br />Energy Saved</div>
-          </div>
-        </div>
-
-        <div class="card leaderboard-card">
-          <h3
-            style="
-              margin-top: 0;
-              margin-bottom: 15px;
-              color: var(--text-main);
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-            "
+        <div class="nav-buttons">
+          <button
+            class="nav-btn active"
+            id="navUser"
+            onclick="switchRole('userPage')"
           >
-            Top Recyclers <span>🏆</span>
-          </h3>
-          <div id="leaderboardList">
-            <p style="text-align: center; color: var(--text-muted)">
-              Loading leaderboard...
+            My Impact
+          </button>
+          <button
+            class="nav-btn"
+            id="navWeigher"
+            onclick="switchRole('weigherPage')"
+          >
+            Weigher Terminal
+          </button>
+          <button
+            class="nav-btn"
+            id="navAdmin"
+            onclick="switchRole('adminPage')"
+          >
+            Admin Panel
+          </button>
+          <button
+            class="nav-btn"
+            id="navProfile"
+            onclick="switchRole('profilePage')"
+          >
+            Profile Settings
+          </button>
+        </div>
+      </div>
+
+      <div class="app-content">
+        <div id="userPage" class="page" style="display: none">
+          <div class="card main-points-card">
+            <p class="greeting">
+              Welcome, <strong id="displayUserName">User</strong>
             </p>
+            <h1 class="points-display">
+              <span id="userPointsDisplay">0</span>
+            </h1>
+            <p class="subtitle">Total Points</p>
+          </div>
+
+          <h3 class="section-title">Lifetime Real-World Impact</h3>
+          <div class="impact-grid">
+            <div class="card impact-card tree-card">
+              <svg
+                class="impact-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 10a6 6 0 0 0 -6 -6h-3v2a6 6 0 0 0 6 6h3" />
+                <path d="M12 14a6 6 0 0 1 6 -6h3v1a6 6 0 0 1 -6 6h-3" />
+                <path d="M12 20v-10" />
+              </svg>
+              <div id="treesSaved" class="impact-number">0.0</div>
+              <div class="impact-label">Trees Saved</div>
+            </div>
+
+            <div class="card impact-card co2-card">
+              <svg
+                class="impact-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path
+                  d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.55 3.487 -3.465 3.487h-11.878"
+                />
+              </svg>
+              <div id="co2Saved" class="impact-number">0.0</div>
+              <div class="impact-label">Kg CO2 Prevented</div>
+            </div>
+
+            <div class="card impact-card energy-card">
+              <svg
+                class="impact-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11" />
+              </svg>
+              <div id="energySaved" class="impact-number">0.0</div>
+              <div class="impact-label">kWh Energy Saved</div>
+            </div>
+          </div>
+
+          <div class="card leaderboard-card">
+            <h3
+              style="
+                margin-top: 0;
+                margin-bottom: 15px;
+                color: var(--text-main);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              "
+            >
+              Top Recyclers
+              <svg
+                class="trophy-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 21h8" />
+                <path d="M12 17v4" />
+                <path d="M7 4h10v4a5 5 0 0 1-10 0V4Z" />
+                <path d="M7 4H4.5a1.5 1.5 0 0 0 0 3H7" />
+                <path d="M17 4h2.5a1.5 1.5 0 0 1 0 3H17" />
+              </svg>
+            </h3>
+            <div id="leaderboardList">
+              <p style="text-align: center; color: var(--text-muted)">
+                Loading leaderboard...
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div id="weigherPage" class="page" style="display: none">
-        <h2>Weigher Terminal</h2>
-        <div class="card">
-          <h3>Step 1: Find User</h3>
-          <label>Enter User ID (UID):</label>
-          <div class="search-row">
-            <input
-              type="text"
-              id="usernameSearch"
-              placeholder="Enter exact database ID"
+        <div id="weigherPage" class="page" style="display: none">
+          <h2>Weigher Terminal</h2>
+          <div class="card">
+            <h3>Step 1: Find User</h3>
+            <label for="liveSearchInput">Search by Name:</label>
+            <div class="search-container">
+              <input
+                type="text"
+                id="liveSearchInput"
+                placeholder="Start typing a name..."
+                autocomplete="off"
+              />
+              <div id="searchResultsDropdown" class="dropdown-list"></div>
+            </div>
+            <p id="searchResult" class="search-result"></p>
+            <hr class="divider" />
+            <div id="weighingForm" style="display: none">
+              <h3>Step 2: Weigh Items</h3>
+              <label for="materialSelect">Material Type:</label>
+              <select id="materialSelect">
+                <option value="plastic">Plastic</option>
+                <option value="cardboard">Cardboard</option>
+                <option value="aluminum">Aluminum</option>
+              </select>
+              <label for="weightInput">Weight (in KG):</label>
+              <input type="number" id="weightInput" placeholder="e.g., 2.5" />
+              <button class="action-btn" onclick="processWeighIn()">
+                Award Points
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="adminPage" class="page" style="display: none">
+          <h2>Admin Panel</h2>
+          <div class="card">
+            <p>Current Point Rates:</p>
+            <ul class="rates-list">
+              <li>Plastic: <strong>100</strong> pts/kg</li>
+              <li>Cardboard: <strong>50</strong> pts/kg</li>
+              <li>Aluminum: <strong>200</strong> pts/kg</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="profilePage" class="page" style="display: none">
+          <h2>Profile Settings</h2>
+
+          <div class="card profile-header">
+            <img
+              id="currentAvatar"
+              src="https://ui-avatars.com/api/?name=User&background=fada67&color=3c78d8"
+              alt="Profile Picture"
             />
-            <button class="action-btn search-btn" onclick="searchUser()">
-              Search
+            <h3
+              id="profileName"
+              style="margin: 10px 0; color: var(--text-main)"
+            >
+              User Name
+            </h3>
+            <br />
+            <input
+              type="file"
+              id="avatarUpload"
+              accept="image/*"
+              style="width: auto; padding: 5px"
+              onchange="uploadProfilePicture()"
+            />
+          </div>
+
+          <div class="card">
+            <h3>Security</h3>
+            <label for="updateEmail">Update Email</label>
+            <input
+              type="email"
+              id="updateEmail"
+              placeholder="New email address"
+            />
+            <button
+              class="action-btn"
+              style="margin-top: 10px; margin-bottom: 25px"
+              onclick="updateUserEmail()"
+            >
+              Save New Email
+            </button>
+
+            <label for="updatePassword">Update Password</label>
+            <input
+              type="password"
+              id="updatePassword"
+              placeholder="New password (min 6 characters)"
+            />
+            <button
+              class="action-btn"
+              style="margin-top: 10px"
+              onclick="updateUserPassword()"
+            >
+              Save New Password
             </button>
           </div>
-          <p id="searchResult" class="search-result"></p>
-
-          <hr class="divider" />
-
-          <div id="weighingForm" style="display: none">
-            <h3>Step 2: Weigh Items</h3>
-            <label>Material Type:</label>
-            <select id="materialSelect">
-              <option value="plastic">Plastic</option>
-              <option value="cardboard">Cardboard</option>
-              <option value="aluminum">Aluminum</option>
-            </select>
-
-            <label>Weight (in KG):</label>
-            <input type="number" id="weightInput" placeholder="e.g., 2.5" />
-
-            <button class="action-btn" onclick="processWeighIn()">
-              Award Points
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div id="adminPage" class="page" style="display: none">
-        <h2>Admin Panel</h2>
-        <div class="card">
-          <p>Current Point Rates:</p>
-          <ul class="rates-list">
-            <li>Plastic: <strong>100</strong> pts/kg</li>
-            <li>Cardboard: <strong>50</strong> pts/kg</li>
-            <li>Aluminum: <strong>200</strong> pts/kg</li>
-          </ul>
         </div>
       </div>
     </div>
