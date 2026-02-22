@@ -8,96 +8,207 @@
   </head>
   <body>
     <div class="container">
-      <h1 class="logo">☀️ CeriaPoints</h1>
+      <h1 class="logo">CeriaPoints</h1>
       <p class="subtitle">Tadika Matahari Ceria Recycling</p>
 
-      <div class="nav-buttons">
-        <button class="nav-btn" onclick="switchRole('userPage')">User</button>
-        <button class="nav-btn" onclick="switchRole('weigherPage')">
-          Weigher
-        </button>
-        <button class="nav-btn" onclick="switchRole('adminPage')">Admin</button>
-      </div>
-      <hr />
+      <div id="authContainer" class="auth-container">
+        <div class="auth-hero">
+          <img
+            src="placeholder-image.png"
+            alt="Sustainability Graphic"
+            class="login-image"
+          />
+          <blockquote class="auth-quote">
+            "Whatever is right, do it with unwavering determination, and see it
+            through to the end."
+            <span class="quote-author"
+              >— Jing Si Aphorisms by Master Cheng Yen</span
+            >
+          </blockquote>
+        </div>
 
-      <div id="userPage" class="page" style="display: block">
-        <h2>User Dashboard</h2>
-        <div class="card">
-          <p>Welcome back!</p>
-          <h3>
-            Your Balance:
-            <span id="userPointsDisplay" class="points">0</span> pts
+        <div id="loginForm">
+          <h2>Account Login</h2>
+          <label>Email Address</label>
+          <input type="email" id="loginEmail" placeholder="Enter your email" />
+          <label>Password</label>
+          <input
+            type="password"
+            id="loginPassword"
+            placeholder="Enter your password"
+          />
+          <button class="action-btn" onclick="loginUser()">Sign In</button>
+          <p class="error-msg" id="loginError"></p>
+          <p class="toggle-text" onclick="toggleAuthView('register')">
+            Need an account? Register here.
+          </p>
+        </div>
+
+        <div id="registerForm" style="display: none">
+          <h2>Create Account</h2>
+          <label>Full Name</label>
+          <input type="text" id="regName" placeholder="e.g. Ali Bin Abu" />
+          <label>Email Address</label>
+          <input type="email" id="regEmail" placeholder="Enter your email" />
+          <label>Password (Min 6 characters)</label>
+          <input
+            type="password"
+            id="regPassword"
+            placeholder="Create a password"
+          />
+          <button class="action-btn" onclick="registerUser()">Register</button>
+          <p class="error-msg" id="regError"></p>
+          <p class="toggle-text" onclick="toggleAuthView('login')">
+            Already have an account? Sign in.
+          </p>
+        </div>
+      </div>
+
+      <div id="appContainer" class="app-container">
+        <div class="nav-buttons">
+          <button class="nav-btn" id="navUser" onclick="switchRole('userPage')">
+            User Dashboard
+          </button>
+          <button
+            class="nav-btn"
+            id="navWeigher"
+            onclick="switchRole('weigherPage')"
+          >
+            Weigher Terminal
+          </button>
+          <button
+            class="nav-btn"
+            id="navAdmin"
+            onclick="switchRole('adminPage')"
+          >
+            Admin Panel
+          </button>
+        </div>
+        <button
+          class="toggle-text"
+          style="border: none; background: none; margin-top: 0"
+          onclick="logoutUser()"
+        >
+          Log Out
+        </button>
+        <hr />
+
+        <div id="userPage" class="page" style="display: none">
+          <h2>My Green Impact</h2>
+          <div class="card" style="text-align: center">
+            <p style="margin-top: 0">
+              Welcome,
+              <strong id="displayUserName" style="color: var(--primary-color)"
+                >User</strong
+              >
+            </p>
+            <h1 style="font-size: 3em; margin: 10px 0; color: var(--text-main)">
+              <span id="userPointsDisplay">0</span>
+            </h1>
+            <p class="subtitle" style="margin-bottom: 0">Total GreenPoints</p>
+          </div>
+
+          <h3
+            style="
+              margin-top: 25px;
+              color: var(--text-muted);
+              font-size: 0.9em;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            "
+          >
+            Lifetime Real-World Impact
           </h3>
+
+          <div class="impact-grid">
+            <div class="card impact-card">
+              <div id="treesSaved" class="impact-number">0.0</div>
+              <div class="impact-label">Trees<br />Saved</div>
+            </div>
+            <div class="card impact-card">
+              <div id="co2Saved" class="impact-number">0.0</div>
+              <div class="impact-label">Kg CO2<br />Prevented</div>
+            </div>
+            <div class="card impact-card">
+              <div id="energySaved" class="impact-number">0.0</div>
+              <div class="impact-label">kWh<br />Energy Saved</div>
+            </div>
+          </div>
+
           <button
             class="action-btn"
             onclick="alert('Reward shop coming soon!')"
           >
-            🎁 View Rewards
+            Redeem Points
           </button>
         </div>
-      </div>
 
-      <div id="weigherPage" class="page" style="display: none">
-        <h2>Weigher Dashboard</h2>
-        <div class="card">
-          <h3>Step 1: Find User</h3>
-          <label>Enter Username (e.g., Ali):</label>
-          <div style="display: flex; gap: 10px">
-            <input
-              type="text"
-              id="usernameSearch"
-              placeholder="Enter exactly as in database"
-            />
+        <div id="weigherPage" class="page" style="display: none">
+          <h2>Weigher Terminal</h2>
+          <div class="card">
+            <h3>Step 1: Find User</h3>
+            <label>Enter User ID (UID):</label>
+            <div style="display: flex; gap: 10px">
+              <input
+                type="text"
+                id="usernameSearch"
+                placeholder="Enter exact database ID"
+              />
+              <button
+                class="action-btn"
+                style="margin-top: 5px; width: auto"
+                onclick="searchUser()"
+              >
+                Search
+              </button>
+            </div>
+            <p
+              id="searchResult"
+              style="
+                color: var(--accent-color);
+                font-weight: bold;
+                margin-top: 10px;
+              "
+            ></p>
+
+            <hr style="margin: 20px 0; border: 1px solid var(--border-color)" />
+
+            <div id="weighingForm" style="display: none">
+              <h3>Step 2: Weigh Items</h3>
+              <label>Material Type:</label>
+              <select id="materialSelect">
+                <option value="plastic">Plastic</option>
+                <option value="cardboard">Cardboard</option>
+                <option value="aluminum">Aluminum</option>
+              </select>
+
+              <label>Weight (in KG):</label>
+              <input type="number" id="weightInput" placeholder="e.g., 2.5" />
+
+              <button class="action-btn" onclick="processWeighIn()">
+                Award Points
+              </button>
+              <p id="weigherMessage" class="success-msg"></p>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminPage" class="page" style="display: none">
+          <h2>Admin Panel</h2>
+          <div class="card">
+            <p>Current Point Rates:</p>
+            <ul>
+              <li>Plastic: <strong>100</strong> pts/kg</li>
+              <li>Cardboard: <strong>50</strong> pts/kg</li>
+              <li>Aluminum: <strong>200</strong> pts/kg</li>
+            </ul>
             <button
               class="action-btn"
-              style="margin-top: 5px; width: auto"
-              onclick="searchUser()"
+              onclick="alert('Settings menu coming soon!')"
             >
-              Search
+              Edit Rates
             </button>
           </div>
-          <p
-            id="searchResult"
-            style="color: #f39c12; font-weight: bold; margin-top: 10px"
-          ></p>
-
-          <hr style="margin: 20px 0; border: 1px solid #eee" />
-
-          <div id="weighingForm" style="display: none">
-            <h3>Step 2: Weigh Items</h3>
-            <label>Material Type:</label>
-            <select id="materialSelect">
-              <option value="plastic">🥤 Plastic</option>
-              <option value="cardboard">📦 Cardboard</option>
-              <option value="aluminum">🥫 Aluminum</option>
-            </select>
-
-            <label>Weight (in KG):</label>
-            <input type="number" id="weightInput" placeholder="e.g., 2.5" />
-
-            <button class="action-btn" onclick="processWeighIn()">
-              ⚖️ Award Points
-            </button>
-            <p id="weigherMessage" class="success-msg"></p>
-          </div>
-        </div>
-      </div>
-
-      <div id="adminPage" class="page" style="display: none">
-        <h2>Admin Dashboard</h2>
-        <div class="card">
-          <p>Current Point Rates:</p>
-          <ul>
-            <li>Plastic: <strong>100</strong> pts/kg</li>
-            <li>Cardboard: <strong>50</strong> pts/kg</li>
-            <li>Aluminum: <strong>200</strong> pts/kg</li>
-          </ul>
-          <button
-            class="action-btn"
-            onclick="alert('Settings menu coming soon!')"
-          >
-            ⚙️ Edit Rates
-          </button>
         </div>
       </div>
     </div>

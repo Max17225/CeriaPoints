@@ -1,74 +1,160 @@
+:root {
+  --primary-color: #2e7d32;
+  --primary-light: #4caf50;
+  --accent-color: #4a86e8; 
+  --bg-color: #f4fdf4;
+  --card-bg: #ffffff;
+  --text-main: #333333;
+  --text-muted: #666666;
+  --border-color: #dddddd;
+  --error-color: #d32f2f;
+}
+
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f4fdf4; /* Very light green background */
-  color: #333;
+  background-color: var(--bg-color);
+  color: var(--text-main);
   display: flex;
   justify-content: center;
   padding: 20px;
+  margin: 0;
 }
 
 .container {
-  background-color: white;
+  background-color: var(--card-bg);
   width: 100%;
   max-width: 500px;
-  border-radius: 15px;
+  border-radius: 8px;
   padding: 30px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   text-align: center;
 }
 
 .logo {
-  color: #f39c12; /* Sunny yellow/orange */
+  color: var(--primary-color);
   margin-bottom: 5px;
+  font-size: 2em;
 }
 
 .subtitle {
-  color: #2ecc71; /* Eco green */
-  font-weight: bold;
+  color: var(--text-muted);
+  font-weight: 500;
   margin-top: 0;
   margin-bottom: 25px;
+}
+
+/* Auth Graphic and Quote Styles */
+.auth-hero {
+  text-align: center;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.login-image {
+  max-width: 150px;
+  height: auto;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.auth-quote {
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0 10px;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.quote-author {
+  display: block;
+  margin-top: 8px;
+  font-weight: bold;
+  font-size: 0.85em;
+  color: var(--accent-color);
+}
+
+/* Authentication Forms */
+.auth-container {
+  display: block;
+}
+.app-container {
+  display: none;
+}
+
+.toggle-text {
+  margin-top: 15px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .nav-buttons {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .nav-btn {
-  background-color: #eee;
-  border: none;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
   padding: 8px 15px;
-  border-radius: 20px;
+  border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+  display: none;
 }
 
 .nav-btn:hover {
-  background-color: #ddd;
+  background-color: #e8f5e9;
 }
 
 .card {
-  background-color: #fdfdfd;
-  border: 2px solid #eef;
-  border-radius: 10px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   padding: 20px;
   margin-top: 15px;
   text-align: left;
 }
 
-.points {
-  color: #27ae60;
-  font-size: 1.5em;
+/* Impact Dashboard Styles */
+.impact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  text-align: center;
+}
+
+.impact-card {
+  margin-top: 0;
+  padding: 15px 10px;
+  text-align: center;
+}
+
+.impact-number {
+  font-size: 1.8em;
   font-weight: bold;
+  color: var(--primary-color);
+}
+
+.impact-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-top: 5px;
 }
 
 label {
   display: block;
   margin-top: 15px;
   font-weight: bold;
-  color: #555;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  text-align: left;
 }
 
 input,
@@ -76,31 +162,41 @@ select {
   width: 100%;
   padding: 10px;
   margin-top: 5px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 .action-btn {
   width: 100%;
-  background-color: #2ecc71;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 4px;
   margin-top: 20px;
-  font-size: 1.1em;
+  font-size: 1em;
   font-weight: bold;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .action-btn:hover {
-  background-color: #27ae60;
+  background-color: var(--primary-light);
 }
 
 .success-msg {
-  color: #27ae60;
+  color: var(--primary-color);
   font-weight: bold;
   text-align: center;
   margin-top: 15px;
+}
+
+.error-msg {
+  color: var(--error-color);
+  font-weight: bold;
+  text-align: center;
+  margin-top: 15px;
+  font-size: 0.9em;
 }
