@@ -9,14 +9,13 @@
   <body>
     <div id="authContainer" class="auth-wrapper">
       <div class="auth-left">
-        <h1 class="logo">CeriaPoints</h1>
-        <p class="subtitle">Tadika Matahari Ceria</p>
-
         <img
-          src="placeholder-image.png"
-          alt="Sustainability Graphic"
-          class="login-image"
+          src="pictures/tmc-logo.png"
+          alt="Tadika Matahari Ceria Logo"
+          class="brand-logo"
         />
+
+        <h1 class="brand-title">CeriaPoints</h1>
 
         <blockquote class="auth-quote">
           "Whatever is right, do it with unwavering determination, and see it
@@ -31,22 +30,17 @@
         <div id="loginForm">
           <h2>Welcome Back</h2>
           <p class="form-subtext">Sign in to your CeriaPoints account.</p>
-
           <label>Email Address</label>
           <input type="email" id="loginEmail" placeholder="Enter your email" />
-
           <label>Password</label>
           <input
             type="password"
             id="loginPassword"
             placeholder="Enter your password"
           />
-
           <button class="action-btn" onclick="loginUser()">Sign In</button>
-          <p class="error-msg" id="loginError"></p>
-
           <div class="auth-links">
-            <p class="toggle-text" onclick="resetPassword()">
+            <p class="toggle-text" onclick="toggleAuthView('forgot')">
               Forgot Password?
             </p>
             <p class="toggle-text" onclick="toggleAuthView('register')">
@@ -55,26 +49,35 @@
           </div>
         </div>
 
+        <div id="forgotForm" style="display: none">
+          <h2>Reset Password</h2>
+          <p class="form-subtext">We'll send a recovery link to your email.</p>
+          <label>Email Address</label>
+          <input type="email" id="resetEmail" placeholder="Enter your email" />
+          <button class="action-btn" onclick="resetPassword()">
+            Send Reset Link
+          </button>
+          <div class="auth-links">
+            <p class="toggle-text" onclick="toggleAuthView('login')">
+              Back to Sign In
+            </p>
+          </div>
+        </div>
+
         <div id="registerForm" style="display: none">
           <h2>Create Account</h2>
           <p class="form-subtext">Join our community recycling program.</p>
-
           <label>Full Name</label>
           <input type="text" id="regName" placeholder="e.g. Ali Bin Abu" />
-
           <label>Email Address</label>
           <input type="email" id="regEmail" placeholder="Enter your email" />
-
           <label>Password</label>
           <input
             type="password"
             id="regPassword"
             placeholder="Min 6 characters"
           />
-
           <button class="action-btn" onclick="registerUser()">Register</button>
-          <p class="error-msg" id="regError"></p>
-
           <div class="auth-links">
             <p class="toggle-text" onclick="toggleAuthView('login')">
               Already have an account? Sign in.
@@ -92,7 +95,7 @@
 
       <div class="nav-buttons">
         <button class="nav-btn" id="navUser" onclick="switchRole('userPage')">
-          User Dashboard
+          My Impact
         </button>
         <button
           class="nav-btn"
@@ -121,7 +124,6 @@
         </div>
 
         <h3 class="section-title">Lifetime Real-World Impact</h3>
-
         <div class="impact-grid">
           <div class="card impact-card">
             <div id="treesSaved" class="impact-number">0.0</div>
@@ -137,12 +139,25 @@
           </div>
         </div>
 
-        <button
-          class="action-btn outline-btn"
-          onclick="alert('Reward shop coming soon!')"
-        >
-          Redeem Points
-        </button>
+        <div class="card leaderboard-card">
+          <h3
+            style="
+              margin-top: 0;
+              margin-bottom: 15px;
+              color: var(--text-main);
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            "
+          >
+            Top Recyclers <span>🏆</span>
+          </h3>
+          <div id="leaderboardList">
+            <p style="text-align: center; color: var(--text-muted)">
+              Loading leaderboard...
+            </p>
+          </div>
+        </div>
       </div>
 
       <div id="weigherPage" class="page" style="display: none">
@@ -179,7 +194,6 @@
             <button class="action-btn" onclick="processWeighIn()">
               Award Points
             </button>
-            <p id="weigherMessage" class="success-msg"></p>
           </div>
         </div>
       </div>
@@ -193,15 +207,11 @@
             <li>Cardboard: <strong>50</strong> pts/kg</li>
             <li>Aluminum: <strong>200</strong> pts/kg</li>
           </ul>
-          <button
-            class="action-btn outline-btn"
-            onclick="alert('Settings menu coming soon!')"
-          >
-            Edit Rates
-          </button>
         </div>
       </div>
     </div>
+
+    <div id="customToast" class="toast"></div>
 
     <script type="module" src="script.js"></script>
   </body>

@@ -1,12 +1,18 @@
 :root {
-  --primary-color: #2e7d32;
-  --primary-light: #4caf50;
-  --accent-color: #4a86e8;
-  --bg-color: #f4fdf4;
+  /* Brand Colors */
+  --primary-color: #3c78d8;
+  --primary-hover: #2a5eb8;
+  --accent-color: #fada67;
+  --accent-hover: #e8c644;
+
+  /* App Backgrounds & text */
+  --bg-color: #f4f8fd;
   --card-bg: #ffffff;
   --text-main: #2c3e50;
-  --text-muted: #7f8c8d;
-  --border-color: #e0e6ed;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+
+  /* Status Colors */
   --error-color: #e74c3c;
   --success-color: #27ae60;
 }
@@ -31,19 +37,20 @@ body {
   background-color: var(--card-bg);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(60, 120, 216, 0.08);
   width: 100%;
   max-width: 900px;
 }
 
 .auth-left {
-  background-color: #e8f5e9;
+  background-color: var(--primary-color);
   padding: 40px;
   text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  color: white;
 }
 
 .auth-right {
@@ -53,19 +60,29 @@ body {
   justify-content: center;
 }
 
-.login-image {
-  max-width: 180px;
+/* Updated for the Sun Logo */
+.brand-logo {
+  max-width: 220px;
   height: auto;
-  border-radius: 12px;
-  margin: 20px 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.brand-title {
+  font-size: 2.4em;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: -15px; /* Pulls it slightly closer to the logo */
+  margin-bottom: 25px;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .auth-quote {
   font-style: italic;
-  color: var(--text-main);
+  color: #e2e8f0; /* Soft light grey/white for readability */
   margin: 0;
-  font-size: 1em;
+  font-size: 1.05em;
   line-height: 1.6;
 }
 
@@ -73,8 +90,8 @@ body {
   display: block;
   margin-top: 10px;
   font-weight: bold;
-  font-size: 0.85em;
-  color: var(--primary-color);
+  font-size: 0.9em;
+  color: var(--accent-color); /* The yellow really pops here */
 }
 
 .form-subtext {
@@ -135,18 +152,19 @@ body {
   border-radius: 12px;
   padding: 25px;
   margin-top: 15px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 15px rgba(60, 120, 216, 0.04);
 }
 
 .main-points-card {
   text-align: center;
   padding: 35px 20px;
+  border-top: 4px solid var(--accent-color); /* A nice yellow accent line at the top */
 }
 
 .points-display {
   font-size: 4em;
   margin: 10px 0;
-  color: var(--text-main);
+  color: var(--primary-color);
   font-weight: 800;
 }
 
@@ -206,7 +224,7 @@ select {
   font-family: inherit;
   font-size: 1em;
   transition: all 0.3s ease;
-  background-color: #f8f9fa;
+  background-color: #f8fafc;
 }
 
 input:focus,
@@ -214,14 +232,14 @@ select:focus {
   border-color: var(--primary-color);
   outline: none;
   background-color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.1);
+  box-shadow: 0 0 0 4px rgba(60, 120, 216, 0.15); /* Blue focus ring */
 }
 
 /* --- BUTTONS --- */
 .action-btn {
   width: 100%;
-  background-color: var(--primary-color);
-  color: white;
+  background-color: var(--accent-color);
+  color: var(--text-main);
   border: none;
   padding: 14px;
   border-radius: 8px;
@@ -230,13 +248,13 @@ select:focus {
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px rgba(46, 125, 50, 0.2);
+  box-shadow: 0 4px 6px rgba(250, 218, 103, 0.3);
 }
 
 .action-btn:hover {
-  background-color: var(--primary-light);
+  background-color: var(--accent-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(46, 125, 50, 0.3);
+  box-shadow: 0 6px 12px rgba(250, 218, 103, 0.4);
 }
 
 .outline-btn {
@@ -247,8 +265,9 @@ select:focus {
 }
 
 .outline-btn:hover {
-  background-color: #f4fdf4;
-  color: var(--primary-color);
+  background-color: #f0f5ff;
+  color: var(--primary-hover);
+  border-color: var(--primary-hover);
   box-shadow: none;
 }
 
@@ -300,8 +319,9 @@ select:focus {
 }
 
 .nav-btn:hover {
-  background-color: #f8f9fa;
-  color: var(--text-main);
+  background-color: #f0f5ff;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 /* --- UTILITIES --- */
@@ -325,7 +345,7 @@ select:focus {
 }
 
 .search-result {
-  color: var(--accent-color);
+  color: var(--primary-color);
   font-weight: bold;
   margin-top: 12px;
 }
@@ -346,4 +366,95 @@ select:focus {
 .rates-list {
   line-height: 1.8;
   color: var(--text-main);
+}
+
+/* --- CUSTOM ALERT (TOAST) --- */
+.toast {
+  visibility: hidden;
+  min-width: 250px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 8px;
+  padding: 16px;
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition:
+    visibility 0.4s,
+    bottom 0.4s ease-out,
+    opacity 0.4s ease-out;
+  opacity: 0;
+}
+
+.toast.show {
+  visibility: visible;
+  bottom: 40px;
+  opacity: 1;
+}
+
+.toast.error {
+  background-color: var(--error-color);
+}
+.toast.success {
+  background-color: var(--success-color);
+}
+
+/* --- LEADERBOARD --- */
+.leaderboard-card {
+  background-color: #fafbfc;
+  border: 1px solid var(--border-color);
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.leaderboard-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.leaderboard-item .rank {
+  font-weight: 800;
+  color: var(--text-muted);
+  width: 35px;
+  font-size: 1.1em;
+}
+
+/* Updated Gold for rank 1 to match your new Accent Yellow */
+.leaderboard-item:nth-child(1) .rank {
+  color: var(--accent-color);
+  font-size: 1.4em;
+}
+.leaderboard-item:nth-child(2) .rank {
+  color: #94a3b8;
+  font-size: 1.3em;
+}
+.leaderboard-item:nth-child(3) .rank {
+  color: #cd7f32;
+  font-size: 1.2em;
+}
+
+.leaderboard-item .name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: left;
+}
+
+.leaderboard-item .score {
+  font-weight: bold;
+  color: var(--primary-color);
+  background: #ebf4ff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.9em;
 }
