@@ -7,22 +7,24 @@ import {
   setDoc,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// Added sendPasswordResetEmail to the imports
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// --- PASTE YOUR FIREBASE CONFIG HERE ---
+// Your EXACT Firebase Configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID",
+  apiKey: "AIzaSyCQOIWX9xisGhtxC14dTJWuss75B50rs-Y",
+  authDomain: "ceriapoints.firebaseapp.com",
+  projectId: "ceriapoints",
+  storageBucket: "ceriapoints.firebasestorage.app",
+  messagingSenderId: "585629666042",
+  appId: "1:585629666042:web:93d8abaeeea976c7d81743",
+  measurementId: "G-3DYD55NMP6",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -32,7 +34,7 @@ const auth = getAuth(app);
 
 // --- APP STATE VARIABLES ---
 let pointRates = { plastic: 100, cardboard: 50, aluminum: 200 };
-let activeUserData = null; // Stores all data for the user being weighed
+let activeUserData = null;
 
 // --- AUTHENTICATION LOGIC ---
 
@@ -64,7 +66,6 @@ window.registerUser = async function () {
     );
     const user = userCredential.user;
 
-    // Create profile with material tracking fields initialized to 0
     await setDoc(doc(db, "users", user.uid), {
       name: name,
       email: email,
@@ -107,10 +108,29 @@ window.loginUser = async function () {
   }
 };
 
+window.resetPassword = async function () {
+  let email = document.getElementById("loginEmail").value.trim();
+  let errorMsg = document.getElementById("loginError");
+
+  if (!email) {
+    errorMsg.innerText =
+      "Please enter your email above, then click 'Forgot Password?'.";
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    alert("Password reset email sent! Please check your inbox.");
+    errorMsg.innerText = "";
+  } catch (error) {
+    errorMsg.innerText = error.message.replace("Firebase: ", "");
+  }
+};
+
 window.logoutUser = function () {
   signOut(auth).then(() => {
     document.getElementById("appContainer").style.display = "none";
-    document.getElementById("authContainer").style.display = "block";
+    document.getElementById("authContainer").style.display = "flex"; // Changed to flex for new layout
     document.getElementById("navUser").style.display = "none";
     document.getElementById("navWeigher").style.display = "none";
     document.getElementById("navAdmin").style.display = "none";
@@ -134,7 +154,6 @@ function loadDashboard(userData) {
     document.getElementById("userPointsDisplay").innerText =
       userData.points || 0;
 
-    // Calculate the environmental impact based on kilograms
     calculateEnvironmentalImpact(userData);
   } else if (userData.role === "weigher") {
     document.getElementById("navWeigher").style.display = "inline-block";
@@ -152,12 +171,10 @@ function calculateEnvironmentalImpact(userData) {
   let plas = userData.totalPlastic || 0;
   let alum = userData.totalAluminum || 0;
 
-  // The accurate real-world formulas
   let trees = card * 0.017;
   let co2 = plas * 1.5;
   let energy = alum * 14.0;
 
-  // Update the UI (formatting to 1 decimal place)
   document.getElementById("treesSaved").innerText = trees.toFixed(1);
   document.getElementById("co2Saved").innerText = co2.toFixed(1);
   document.getElementById("energySaved").innerText = energy.toFixed(1);
@@ -184,11 +201,11 @@ window.searchUser = async function () {
 
     if (userSnap.exists()) {
       activeUserData = userSnap.data();
-      activeUserData.uid = username; // Store ID for updating later
+      activeUserData.uid = username;
 
       let currentPoints = activeUserData.points || 0;
       resultText.innerText = `Found: ${activeUserData.name} (Current Points: ${currentPoints})`;
-      resultText.style.color = "var(--primary-color)";
+      resultText.style.color = "var(--success-color)";
       weighForm.style.display = "block";
       document.getElementById("weigherMessage").innerText = "";
     } else {
@@ -213,37 +230,30 @@ window.processWeighIn = async function () {
     return;
   }
 
-  // 1. Calculate new points
   let pointsEarned = weight * pointRates[material];
   let newTotalPoints = (activeUserData.points || 0) + pointsEarned;
 
-  // 2. Determine which specific material to track
   let databaseFieldToUpdate = "";
   if (material === "cardboard") databaseFieldToUpdate = "totalCardboard";
   else if (material === "plastic") databaseFieldToUpdate = "totalPlastic";
   else if (material === "aluminum") databaseFieldToUpdate = "totalAluminum";
 
-  // Calculate new total weight for that specific material
   let currentMaterialWeight = activeUserData[databaseFieldToUpdate] || 0;
   let newMaterialWeight = currentMaterialWeight + weight;
 
   try {
-    // Update both points AND the material tracker in Firebase
     const userRef = doc(db, "users", activeUserData.uid);
     await updateDoc(userRef, {
       points: newTotalPoints,
       [databaseFieldToUpdate]: newMaterialWeight,
     });
 
-    // Update local tracking
     activeUserData.points = newTotalPoints;
     activeUserData[databaseFieldToUpdate] = newMaterialWeight;
 
-    // Show success message
     document.getElementById("weigherMessage").innerText =
       `Success! Added ${pointsEarned} pts. User now has ${newTotalPoints} total points.`;
 
-    // Reset form
     document.getElementById("weightInput").value = "";
     document.getElementById("weighingForm").style.display = "none";
     document.getElementById("searchResult").innerText =
