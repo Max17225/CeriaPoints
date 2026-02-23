@@ -703,24 +703,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (weightInput) {
-    weightInput.addEventListener("input", function (e) {
-      let val = this.value.replace(/[^0-9.]/g, "");
-      if (val.includes(".")) {
-        let parts = val.split(".");
-        if (parts[1].length > 3) {
-          val = parts[0] + "." + parts[1].substring(0, 3);
-        }
-      }
-      this.value = val;
-    });
-
     weightInput.addEventListener("blur", function (e) {
-      if (this.value && !isNaN(this.value)) {
-        this.value = parseFloat(this.value).toFixed(3);
+      let safeVal = this.value.replace(",", ".");
+      if (safeVal && !isNaN(safeVal)) {
+        this.value = parseFloat(safeVal).toFixed(3);
       }
     });
   }
-}); // <-- THIS IS THE MISSING BRACKET I ADDED!
+}); 
 
 function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
