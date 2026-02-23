@@ -49,6 +49,7 @@ let pointRates = {
 let activeUserData = null;
 let weigherTargetUser = null;
 let cachedUsers = [];
+let isRegistering = false; // NEW: Flag to prevent auto-login flash
 
 // --- TOAST & ERRORS ---
 window.showToast = function (message, type = "success") {
@@ -94,6 +95,9 @@ window.registerUser = async function () {
   if (!name || !email || !password)
     return showToast("Please fill in all registration fields.", "error");
 
+  // Tell the listener to ignore the automatic login
+  isRegistering = true;
+
   try {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -111,9 +115,20 @@ window.registerUser = async function () {
       totalAluminum: 0,
       profilePic: "",
     });
+
+    // Immediately sign them out before they hit the dashboard
+    await signOut(auth);
+    isRegistering = false;
+
+    // Clear the form fields
+    document.getElementById("regName").value = "";
+    document.getElementById("regEmail").value = "";
+    document.getElementById("regPassword").value = "";
+
     showToast("Account created successfully! Please log in.", "success");
     toggleAuthView("login");
   } catch (error) {
+    isRegistering = false;
     showToast(getFriendlyErrorMessage(error.code), "error");
   }
 };
@@ -183,6 +198,9 @@ window.confirmLogout = function () {
 
 // AUTO-LOGIN PERSISTENCE
 onAuthStateChanged(auth, async (user) => {
+  // If a registration is currently happening, completely ignore this!
+  if (isRegistering) return;
+
   if (user) {
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -200,6 +218,18 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("authContainer").style.display = "flex";
   }
 });
+
+// --- REVEAL PASSWORD LOGIC ---
+window.togglePassword = function (inputId, btnElement) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+  } else {
+    input.type = "password";
+    btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  }
+};
 
 // --- APP ROUTING & DASHBOARD ---
 function loadDashboard(userData) {
@@ -300,7 +330,6 @@ window.renderAdminRates = function () {
     const row = document.createElement("div");
     row.className = "admin-rate-row";
 
-    // NEW: Added the Impact Type dropdown directly to the live edit rows
     row.innerHTML = `
       <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled style="min-width: 80px;">
       <div class="rate-inputs" style="flex-wrap: wrap;">
@@ -323,7 +352,7 @@ window.renderAdminRates = function () {
 window.updateExistingRate = async function (material) {
   const newRate = parseInt(document.getElementById(`rate_${material}`).value);
   const newMult = parseFloat(document.getElementById(`mult_${material}`).value);
-  const newImpact = document.getElementById(`impact_${material}`).value; // Grabs the newly selected dropdown
+  const newImpact = document.getElementById(`impact_${material}`).value;
 
   if (isNaN(newRate) || newRate <= 0)
     return showToast("Rate must be at least 1.", "error");
@@ -332,7 +361,7 @@ window.updateExistingRate = async function (material) {
 
   pointRates[material].rate = newRate;
   pointRates[material].multiplier = newMult;
-  pointRates[material].impactType = newImpact; // Saves the impact type
+  pointRates[material].impactType = newImpact;
 
   try {
     await setDoc(doc(db, "settings", "rates"), pointRates);
@@ -436,7 +465,6 @@ window.updateUserEmail = async function () {
 
 window.updateUserPassword = async function () {
   const currentPassword = document.getElementById("currentPassword").value;
-  // FIX: Swapped to the new collision-free ID
   const newPassword = document.getElementById("newPasswordInput").value;
 
   if (!currentPassword)
@@ -480,7 +508,6 @@ window.fetchLeaderboard = async function () {
       return;
     }
 
-    // FIX: Removed the limit(5) so EVERYONE shows up!
     const q = query(collection(db, "users"), orderBy("points", "desc"));
     const querySnapshot = await getDocs(q);
     let html = "";
@@ -488,7 +515,6 @@ window.fetchLeaderboard = async function () {
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      // FIX: Removed the data.points > 0 requirement so people with 0 show up at the bottom
       if (data.role === "user") {
         const avatarSrc =
           data.profilePic ||
@@ -666,17 +692,5 @@ window.processWeighIn = async function () {
     fetchUsersForSearch();
   } catch (error) {
     showToast("Error saving data. Please try again.", "error");
-  }
-};
-
-// --- REVEAL PASSWORD LOGIC ---
-window.togglePassword = function (inputId, btnElement) {
-  const input = document.getElementById(inputId);
-  if (input.type === "password") {
-    input.type = "text";
-    btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
-  } else {
-    input.type = "password";
-    btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
   }
 };
