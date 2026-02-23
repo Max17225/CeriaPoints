@@ -23,7 +23,6 @@
 body {
   font-family: system-ui, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: #e0f2ff;
-  /* Beautiful Watercolor bubbles */
   background-image:
     radial-gradient(
       circle at 15% 20%,
@@ -535,13 +534,14 @@ body {
 /* --- ADMIN PANEL SPECIFICS --- */
 .admin-rate-row {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   margin-bottom: 15px;
   align-items: center;
   background: #ffffff;
-  padding: 10px 15px;
+  padding: 15px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 .admin-rate-row input[type="text"] {
   background: transparent;
@@ -550,23 +550,36 @@ body {
   padding: 0;
   font-weight: 700;
   color: var(--text-main);
+  flex: 1;
+  min-width: 100px;
+}
+.admin-rate-row .rate-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 .admin-rate-row input[type="number"] {
-  width: 100px;
+  width: 90px;
   padding: 8px 12px;
 }
 .admin-add-row {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 10px;
+  align-items: center;
   margin-top: 10px;
+  flex-wrap: wrap;
 }
-.admin-add-row input {
-  flex: 1;
+.admin-add-row > * {
+  flex: 1 1 120px;
 }
 .admin-add-row button {
-  width: auto;
-  padding: 12px 20px;
+  flex: 1 1 100%;
+  padding: 14px 20px;
+}
+@media (min-width: 768px) {
+  .admin-add-row button {
+    flex: 0 1 auto;
+  }
 }
 
 /* --- ACCESSIBLE WEIGHER TERMINAL (Senior-Friendly) --- */
@@ -817,16 +830,20 @@ select:focus {
   /* Shrinks massive text */
   .points-display {
     font-size: 3.2em;
-  } 
+  }
   .impact-number {
     font-size: 1.8em;
   }
 
-  /* Stacks elements gracefully so they don't look tight */
   .impact-grid {
-    grid-template-columns: 1fr;
-    gap: 20px; /* More spacing between stacked cards */
+    grid-template-columns: 1fr; 
+    gap: 5px; 
   }
+
+  .impact-card {
+    padding: 20px 10px;
+  }
+
   .nav-buttons {
     flex-direction: column;
     width: 100%;
@@ -850,7 +867,7 @@ select:focus {
     width: 100%;
     margin-top: 5px;
   }
-  .admin-rate-row input[type="number"], 
+  .admin-rate-row input[type="number"],
   .admin-rate-row input[type="text"] {
     width: 100%;
   }
@@ -869,5 +886,58 @@ select:focus {
   }
   .profile-name {
     font-size: 1.25em;
+  }
+}
+
+.impact-label {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(44, 62, 80, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal-card {
+  width: 90%;
+  max-width: 400px;
+  animation: modalFadeIn 0.2s ease-out;
+  text-align: center;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   IPAD / TABLET RESPONSIVENESS (Fixes cut-off text on medium screens)
+   ========================================================================== */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .impact-card {
+    padding: 15px 10px;
+  }
+  .impact-number {
+    font-size: 1.8em;
+  }
+  .impact-label {
+    font-size: 0.75em;
   }
 }

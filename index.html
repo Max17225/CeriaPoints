@@ -332,7 +332,6 @@
                 "
               >
                 <option value="current">2026 (Current)</option>
-                <option value="2025">2025 History</option>
               </select>
 
               <svg
@@ -452,7 +451,8 @@
             <div class="security-form">
               <h4 class="form-section-title">Live Material Rates</h4>
               <p class="form-subtext" style="margin-bottom: 15px">
-                Edit points awarded per KG. Changes sync instantly.
+                Edit points awarded and environmental multipliers. Changes sync
+                instantly.
               </p>
               <div id="adminRatesList"></div>
             </div>
@@ -460,26 +460,46 @@
             <div class="security-form" style="margin-top: 20px">
               <h4 class="form-section-title">Add Material</h4>
               <p class="form-subtext" style="margin-bottom: 15px">
-                Register a new recyclable material to the system.
+                Register a new material, select its environmental impact
+                category, and set the multiplier per KG.
               </p>
+
               <div class="admin-add-row">
                 <input
                   type="text"
                   id="newMaterialName"
-                  placeholder="Material Name (e.g. Glass)"
+                  placeholder="Name (e.g. Glass)"
+                  required
                 />
                 <input
                   type="number"
                   id="newMaterialRate"
-                  placeholder="Points per KG"
+                  placeholder="Pts/KG"
                   min="1"
+                  required
+                />
+
+                <select id="newMaterialImpact" required>
+                  <option value="" disabled selected>Select Impact</option>
+                  <option value="trees">Trees Saved</option>
+                  <option value="co2">CO2 Prevented (kg)</option>
+                  <option value="energy">Energy Saved (kWh)</option>
+                </select>
+
+                <input
+                  type="number"
+                  id="newMaterialMultiplier"
+                  placeholder="Mult. (e.g. 1.5)"
+                  step="0.001"
+                  min="0"
+                  required
                 />
                 <button
                   class="action-btn"
                   style="margin-top: 0"
                   onclick="addNewMaterial()"
                 >
-                  Add Material
+                  Add
                 </button>
               </div>
             </div>
@@ -639,6 +659,38 @@
               </button>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="logoutModal" class="modal-overlay" style="display: none">
+      <div class="card modal-card">
+        <h3 style="margin-top: 0; color: var(--primary-color)">Log Out</h3>
+        <p style="color: var(--text-muted); margin-bottom: 25px">
+          Are you sure you want to log out of CeriaPoints?
+        </p>
+        <div style="display: flex; gap: 15px">
+          <button
+            class="outline-btn"
+            style="width: 50%; margin: 0; padding: 12px"
+            onclick="closeLogoutModal()"
+          >
+            Cancel
+          </button>
+          <button
+            class="action-btn"
+            style="
+              width: 50%;
+              margin: 0;
+              padding: 12px;
+              background-color: var(--error-color);
+              color: white;
+              box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);
+            "
+            onclick="confirmLogout()"
+          >
+            Log Out
+          </button>
         </div>
       </div>
     </div>

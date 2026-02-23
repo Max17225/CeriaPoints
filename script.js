@@ -39,8 +39,13 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// App State
-let pointRates = { plastic: 100, cardboard: 50, aluminum: 200 };
+// NEW: Highly Scalable Object Structure for Rates & Math
+let pointRates = {
+  plastic: { rate: 100, impactType: "co2", multiplier: 1.5 },
+  cardboard: { rate: 50, impactType: "trees", multiplier: 0.017 },
+  aluminum: { rate: 200, impactType: "energy", multiplier: 14.0 },
+};
+
 let activeUserData = null;
 let weigherTargetUser = null;
 let cachedUsers = [];
@@ -154,7 +159,21 @@ window.resetPassword = async function () {
   }
 };
 
+// --- CUSTOM LOGOUT LOGIC ---
 window.logoutUser = function () {
+  // Shows our custom modal instead of the default browser alert
+  document.getElementById("logoutModal").style.display = "flex";
+};
+
+window.closeLogoutModal = function () {
+  // Hides the modal if they click cancel
+  document.getElementById("logoutModal").style.display = "none";
+};
+
+window.confirmLogout = function () {
+  // Actually logs them out if they click the red Log Out button
+  document.getElementById("logoutModal").style.display = "none";
+
   signOut(auth).then(() => {
     document.getElementById("appContainer").style.display = "none";
     document.getElementById("authContainer").style.display = "flex";
@@ -225,13 +244,19 @@ window.switchRole = function (roleId) {
   if (roleId === "adminPage") renderAdminRates();
 };
 
-// --- ADMIN PANEL (DYNAMIC RATES) ---
+// --- SCALABLE ADMIN PANEL ---
 async function fetchAdminRates() {
   try {
     const docRef = doc(db, "settings", "rates");
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      pointRates = docSnap.data();
+      const data = docSnap.data();
+      // Check for legacy flat format and upgrade if needed
+      if (typeof data.plastic === "number") {
+        await setDoc(docRef, pointRates);
+      } else {
+        pointRates = data;
+      }
     } else {
       await setDoc(docRef, pointRates);
     }
@@ -245,10 +270,10 @@ function updateMaterialDropdowns() {
   const select = document.getElementById("materialSelect");
   if (select) {
     select.innerHTML = "";
-    for (const [material, rate] of Object.entries(pointRates)) {
+    for (const [material, data] of Object.entries(pointRates)) {
       const opt = document.createElement("option");
       opt.value = material;
-      opt.innerText = `${material.charAt(0).toUpperCase() + material.slice(1)} (${rate} pts/kg)`;
+      opt.innerText = `${material.charAt(0).toUpperCase() + material.slice(1)} (${data.rate} pts/kg)`;
       select.appendChild(opt);
     }
   }
@@ -257,13 +282,18 @@ function updateMaterialDropdowns() {
 window.renderAdminRates = function () {
   const container = document.getElementById("adminRatesList");
   container.innerHTML = "";
-  for (const [material, rate] of Object.entries(pointRates)) {
+  for (const [material, data] of Object.entries(pointRates)) {
     const row = document.createElement("div");
     row.className = "admin-rate-row";
     row.innerHTML = `
-      <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled style="flex: 1; background: #f8fafc; font-weight: bold; color: var(--primary-color);">
-      <input type="number" id="rate_${material}" value="${rate}" style="width: 120px;" min="1">
-      <button class="outline-btn" style="padding: 12px 20px; width: auto; margin: 0;" onclick="updateExistingRate('${material}')">Save Edit</button>
+      <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled>
+      <div class="rate-inputs">
+        <span style="font-size:0.85em; color:var(--text-muted);">Rate:</span>
+        <input type="number" id="rate_${material}" value="${data.rate}" min="1">
+        <span style="font-size:0.85em; color:var(--text-muted); margin-left:5px;">Mult:</span>
+        <input type="number" id="mult_${material}" value="${data.multiplier}" step="0.001" min="0">
+      </div>
+      <button class="outline-btn small-btn" style="margin: 0;" onclick="updateExistingRate('${material}')">Save</button>
     `;
     container.appendChild(row);
   }
@@ -271,13 +301,18 @@ window.renderAdminRates = function () {
 
 window.updateExistingRate = async function (material) {
   const newRate = parseInt(document.getElementById(`rate_${material}`).value);
+  const newMult = parseFloat(document.getElementById(`mult_${material}`).value);
+
   if (isNaN(newRate) || newRate <= 0)
     return showToast("Rate must be at least 1.", "error");
+  if (isNaN(newMult) || newMult < 0)
+    return showToast("Multiplier cannot be negative.", "error");
 
-  pointRates[material] = newRate;
+  pointRates[material].rate = newRate;
+  pointRates[material].multiplier = newMult;
   try {
     await setDoc(doc(db, "settings", "rates"), pointRates);
-    showToast(`${material} updated to ${newRate} pts/kg!`, "success");
+    showToast(`${material} updated successfully!`, "success");
     updateMaterialDropdowns();
   } catch (e) {
     showToast("Failed to save to database.", "error");
@@ -290,17 +325,26 @@ window.addNewMaterial = async function () {
     .value.trim()
     .toLowerCase();
   const rate = parseInt(document.getElementById("newMaterialRate").value);
+  const impact = document.getElementById("newMaterialImpact").value;
+  const mult = parseFloat(
+    document.getElementById("newMaterialMultiplier").value,
+  );
 
   if (!name) return showToast("Please enter a material name.", "error");
   if (isNaN(rate) || rate <= 0)
     return showToast("Points must be at least 1.", "error");
+  if (!impact) return showToast("Please select an impact category.", "error");
+  if (isNaN(mult) || mult < 0)
+    return showToast("Multiplier must be a valid number.", "error");
 
-  pointRates[name] = rate;
+  pointRates[name] = { rate: rate, impactType: impact, multiplier: mult };
   try {
     await setDoc(doc(db, "settings", "rates"), pointRates);
     showToast(`${name} added successfully!`, "success");
     document.getElementById("newMaterialName").value = "";
     document.getElementById("newMaterialRate").value = "";
+    document.getElementById("newMaterialImpact").value = "";
+    document.getElementById("newMaterialMultiplier").value = "";
     renderAdminRates();
     updateMaterialDropdowns();
   } catch (e) {
@@ -396,22 +440,13 @@ window.updateUserPassword = async function () {
   }
 };
 
-// --- LEADERBOARD & IMPACT LOGIC ---
+// --- LEADERBOARD & IMPACT MATH ---
 window.fetchLeaderboard = async function () {
   const leaderboardList = document.getElementById("leaderboardList");
-  const yearSelect = document.getElementById("leaderboardYear");
-  const selectedYear = yearSelect ? yearSelect.value : "current";
-
   leaderboardList.innerHTML =
     '<p style="text-align: center; color: var(--text-muted);">Fetching scores...</p>';
 
   try {
-    // Basic logic implemented to differentiate UI based on year selected
-    if (selectedYear !== "current") {
-      leaderboardList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Viewing archived records for ${selectedYear}...</p>`;
-      return;
-    }
-
     const q = query(
       collection(db, "users"),
       orderBy("points", "desc"),
@@ -441,16 +476,31 @@ window.fetchLeaderboard = async function () {
   }
 };
 
+// NEW: Highly Scalable Dynamic Environmental Math
 function calculateEnvironmentalImpact(userData) {
-  const card = userData.totalCardboard || 0;
-  const plas = userData.totalPlastic || 0;
-  const alum = userData.totalAluminum || 0;
-  document.getElementById("treesSaved").innerText = (card * 0.017).toFixed(1);
-  document.getElementById("co2Saved").innerText = (plas * 1.5).toFixed(1);
-  document.getElementById("energySaved").innerText = (alum * 14.0).toFixed(1);
+  let totalTrees = 0;
+  let totalCO2 = 0;
+  let totalEnergy = 0;
+
+  // Loops through every material defined in the Admin panel and calculates total
+  for (const [material, config] of Object.entries(pointRates)) {
+    const dbField =
+      "total" + material.charAt(0).toUpperCase() + material.slice(1);
+    const userWeight = userData[dbField] || 0;
+
+    if (config.impactType === "trees")
+      totalTrees += userWeight * config.multiplier;
+    if (config.impactType === "co2") totalCO2 += userWeight * config.multiplier;
+    if (config.impactType === "energy")
+      totalEnergy += userWeight * config.multiplier;
+  }
+
+  document.getElementById("treesSaved").innerText = totalTrees.toFixed(1);
+  document.getElementById("co2Saved").innerText = totalCO2.toFixed(1);
+  document.getElementById("energySaved").innerText = totalEnergy.toFixed(1);
 }
 
-// --- WEIGHER TERMINAL (LIVE SEARCH & FORMATTING) ---
+// --- WEIGHER TERMINAL ---
 async function fetchUsersForSearch() {
   try {
     const q = query(collection(db, "users"));
@@ -511,10 +561,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ACTIVE INPUT FORMATTING (Strict 2 Decimals allowed while typing)
   if (weightInput) {
     weightInput.addEventListener("input", function (e) {
-      // Strips anything that isn't a number or a dot
       let val = this.value.replace(/[^0-9.]/g, "");
       if (val.includes(".")) {
         let parts = val.split(".");
@@ -525,7 +573,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.value = val;
     });
 
-    // Auto-pads with zeros on blur (e.g. "1" becomes "1.00")
     weightInput.addEventListener("blur", function (e) {
       if (this.value && !isNaN(this.value)) {
         this.value = parseFloat(this.value).toFixed(2);
@@ -536,7 +583,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
-  // Beautiful CeriaPoints Yellow for the Current Points text
   document.getElementById("searchResult").innerHTML = `
     Selected: ${userMatch.name} <br> 
     <span style="font-size: 0.9em; color: var(--text-muted); display: block; margin-top: 5px;">
@@ -556,8 +602,9 @@ window.processWeighIn = async function () {
 
   weight = parseFloat(weight.toFixed(2));
 
-  const rate = pointRates[material] || 0;
-  const pointsEarned = Math.floor(weight * rate);
+  // Points calculated against the dynamic object
+  const rateConfig = pointRates[material] || { rate: 0 };
+  const pointsEarned = Math.floor(weight * rateConfig.rate);
 
   try {
     const userRef = doc(db, "users", weigherTargetUser.uid);
@@ -584,8 +631,7 @@ window.processWeighIn = async function () {
 
     document.getElementById("weightInput").value = "";
     document.getElementById("weighingForm").style.display = "none";
-    document.getElementById("searchResult").innerHTML =
-      "Ready for next weigh-in.";
+    document.getElementById("searchResult").innerHTML = "";
     document.getElementById("liveSearchInput").value = "";
     weigherTargetUser = null;
 
