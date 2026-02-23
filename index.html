@@ -27,10 +27,9 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <path d="M21 8v5a1 1 0 0 1-1 1H11.5" />
-                <path d="m15 11 3 3 3-3" />
-                <path d="M3 16v-5a1 1 0 0 1 1-1h8.5" />
-                <path d="m9 13-3-3-3 3" />
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 6.91 14.14 2 9.27 8.91 8.26 12 2"
+                ></polygon>
               </svg>
             </div>
             <div class="feature-text">
@@ -103,12 +102,35 @@
             required
           />
           <label for="loginPassword">Password</label>
-          <input
-            type="password"
-            id="loginPassword"
-            placeholder="Enter your password"
-            required
-          />
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="loginPassword"
+              placeholder="Enter your password"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              onclick="togglePassword('loginPassword', this)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+
           <button type="submit" class="action-btn">Sign In</button>
           <div class="auth-links">
             <p class="toggle-text" onclick="toggleAuthView('forgot')">
@@ -170,13 +192,36 @@
             required
           />
           <label for="regPassword">Password</label>
-          <input
-            type="password"
-            id="regPassword"
-            placeholder="Enter your password..."
-            required
-            minlength="6"
-          />
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="regPassword"
+              placeholder="Enter your password..."
+              required
+              minlength="6"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              onclick="togglePassword('regPassword', this)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+
           <button type="submit" class="action-btn">Register</button>
           <div class="auth-links">
             <p class="toggle-text" onclick="toggleAuthView('login')">
@@ -602,12 +647,36 @@
               <label for="emailCurrentPassword" style="margin-top: 15px"
                 >Current Password</label
               >
-              <input
-                type="password"
-                id="emailCurrentPassword"
-                placeholder="Verify your current password"
-                required
-              />
+              <div class="password-wrapper">
+                <input
+                  type="password"
+                  id="emailCurrentPassword"
+                  placeholder="Verify your current password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  onclick="togglePassword('emailCurrentPassword', this)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                    ></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
 
               <button
                 type="submit"
@@ -632,23 +701,71 @@
               </p>
 
               <label for="currentPassword">Current Password</label>
-              <input
-                type="password"
-                id="currentPassword"
-                placeholder="Enter your current password"
-                required
-              />
+              <div class="password-wrapper">
+                <input
+                  type="password"
+                  id="currentPassword"
+                  placeholder="Enter your current password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  onclick="togglePassword('currentPassword', this)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                    ></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
 
               <label for="newPasswordInput" style="margin-top: 15px"
                 >New Password</label
               >
-              <input
-                type="password"
-                id="newPasswordInput"
-                placeholder="Min 6 characters"
-                required
-                minlength="6"
-              />
+              <div class="password-wrapper">
+                <input
+                  type="password"
+                  id="newPasswordInput"
+                  placeholder="Min 6 characters"
+                  required
+                  minlength="6"
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  onclick="togglePassword('newPasswordInput', this)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                    ></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
 
               <button
                 type="submit"

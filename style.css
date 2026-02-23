@@ -186,8 +186,8 @@ body {
 .app-header-wrapper {
   background-color: var(--primary-color);
   padding: 25px 30px 20px 30px;
-  border-top-left-radius: 16px; 
-  border-top-right-radius: 16px; 
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
 }
 .app-header {
   display: flex;
@@ -689,7 +689,7 @@ body {
 }
 .form-subtext {
   color: var(--text-muted);
-  margin: -10px 0 25px 0;
+  margin: 5px 0 25px 0;
   font-size: 0.95em;
 }
 .auth-links {
@@ -704,6 +704,32 @@ label {
   color: var(--text-main);
   font-size: 0.9em;
 }
+
+/* --- NEW: REVEAL PASSWORD CSS --- */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-wrapper input {
+  width: 100%;
+  padding-right: 45px; /* Makes room for the eye icon */
+}
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  display: flex;
+}
+.toggle-password:hover {
+  color: var(--primary-color);
+}
+
 input,
 select {
   width: 100%;
