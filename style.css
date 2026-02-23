@@ -267,40 +267,109 @@ body {
   padding: 30px;
 }
 
-/* --- DASHBOARD --- */
+/* --- DASHBOARD CARD --- */
 .main-points-card {
-  text-align: center;
-  padding: 35px 20px;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--primary-hover)
+  position: relative;
+  overflow: hidden;
+  padding: 30px;
+  background: linear-gradient(135deg, #3c78d8 0%, #4aa3ba 60%, #5bbd9c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 12px 30px rgba(60, 120, 216, 0.3);
+  border-radius: 20px;
+  text-align: left;
+}
+
+.card-decoration {
+  position: absolute;
+  top: -80px;
+  right: -40px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(
+    circle,
+    rgba(250, 218, 103, 0.3) 0%,
+    transparent 70%
   );
-  border: none !important;
-  box-shadow: 0 8px 20px rgba(60, 120, 216, 0.2);
-  border-radius: 12px;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: overlay;
 }
-.main-points-card .greeting {
-  color: #e2e8f0;
+
+.card-content-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
 }
-.main-points-card .greeting strong {
-  color: var(--accent-color);
+
+.greeting-section {
+  text-align: left;
 }
-.points-display {
-  font-size: 4.5em;
-  margin: 5px 0;
+.greeting-subtext {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.15em;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.user-name {
+  font-size: 2.4em;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.points-section {
+  text-align: right;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 20px 25px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.points-subtitle {
   color: var(--accent-color);
   font-weight: 800;
-  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-.main-points-card .subtitle {
-  color: #ffffff;
-  font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  font-size: 0.85em;
-  margin-bottom: 0;
+  font-size: 0.8em;
+  margin: 0 0 8px 0;
+  opacity: 0.9;
 }
+
+.points-value-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.points-star {
+  width: 36px;
+  height: 36px;
+  fill: var(--accent-color);
+  filter: drop-shadow(0 3px 6px rgba(250, 218, 103, 0.5));
+  transform: translateY(3px);
+}
+
+.points-display {
+  font-size: 4.5em;
+  margin: 0;
+  color: #ffffff;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pts-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 800;
+  font-size: 1.3em;
+}
+
 .section-title {
   margin-top: 30px;
   color: var(--text-muted);
@@ -826,97 +895,6 @@ select:focus {
   background-color: var(--success-color);
 }
 
-/* ==========================================================================
-   MOBILE RESPONSIVENESS - Clean, spacing adjustments, scaling down text
-   ========================================================================== */
-@media (max-width: 768px) {
-  .auth-wrapper {
-    flex-direction: column;
-    min-height: auto;
-  }
-  .auth-left,
-  .auth-right {
-    padding: 30px 20px;
-  }
-
-  body {
-    padding: 10px; /* Less margin on mobile */
-  }
-
-  .app-container {
-    margin: 10px auto;
-    width: 100%;
-    border-radius: 12px;
-  }
-  .app-content {
-    padding: 20px 15px; /* Adds breathing room to avoid feeling tight */
-  }
-  .app-header-wrapper {
-    padding: 20px 15px;
-  }
-
-  /* Shrinks massive text */
-  .points-display {
-    font-size: 3.2em;
-  }
-  .impact-number {
-    font-size: 1.8em;
-  }
-
-  .impact-grid {
-    grid-template-columns: 1fr;
-    gap: 5px;
-  }
-
-  .impact-card {
-    padding: 20px 10px;
-  }
-
-  .nav-buttons {
-    flex-direction: column;
-    width: 100%;
-    gap: 8px;
-  }
-  .nav-btn {
-    padding: 12px;
-    font-size: 1em;
-    width: 100%;
-  }
-
-  /* Admin forms stack neatly */
-  .admin-add-row,
-  .admin-rate-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  .admin-add-row button,
-  .admin-rate-row button {
-    width: 100%;
-    margin-top: 5px;
-  }
-  .admin-rate-row input[type="number"],
-  .admin-rate-row input[type="text"] {
-    width: 100%;
-  }
-
-  .large-input,
-  .large-btn {
-    font-size: 1.1em;
-    padding: 15px;
-  }
-  .step-title {
-    font-size: 1.25em;
-  }
-
-  .card {
-    padding: 20px 15px;
-  }
-  .profile-name {
-    font-size: 1.25em;
-  }
-}
-
 .impact-label {
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -998,5 +976,120 @@ select:focus {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   MOBILE RESPONSIVENESS
+   ========================================================================== */
+@media (max-width: 768px) {
+  .auth-wrapper {
+    flex-direction: column;
+    min-height: auto;
+  }
+  .auth-left,
+  .auth-right {
+    padding: 30px 20px;
+  }
+
+  body {
+    padding: 10px;
+  }
+
+  .app-container {
+    margin: 10px auto;
+    width: 100%;
+    border-radius: 12px;
+  }
+  .app-content {
+    padding: 20px 15px;
+  }
+  .app-header-wrapper {
+    padding: 20px 15px;
+  }
+
+  /* Hero Card Stacking */
+  .card-content-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 25px;
+  }
+  .greeting-section {
+    margin-bottom: 5px;
+  }
+  .points-section {
+    width: 100%;
+    text-align: left;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .points-subtitle {
+    text-align: left;
+  }
+  .points-value-row {
+    justify-content: flex-start;
+  }
+  .points-display {
+    font-size: 3.8em;
+  }
+  .points-star {
+    width: 32px;
+    height: 32px;
+    transform: translateY(2px);
+  }
+
+  /* --- FIX: OPTIMIZED IMPACT CARDS FOR MOBILE --- */
+  .impact-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px; /* Very tight gap so they fit */
+  }
+  .impact-card {
+    padding: 15px 5px; /* Less internal padding */
+  }
+  .impact-icon {
+    width: 28px; /* Smaller icon */
+    height: 28px;
+    margin-bottom: 8px;
+  }
+  .impact-number {
+    font-size: 1.3em; /* Shrunk down so 3-digit numbers fit easily */
+    word-break: break-word;
+  }
+  .impact-label {
+    font-size: 0.65em; /* Scaled down subtext */
+    line-height: 1.2;
+  }
+
+  /* Admin forms stack neatly */
+  .admin-add-row,
+  .admin-rate-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .admin-add-row button,
+  .admin-rate-row button {
+    width: 100%;
+    margin-top: 5px;
+  }
+  .admin-rate-row input[type="number"],
+  .admin-rate-row input[type="text"] {
+    width: 100%;
+  }
+
+  .large-input,
+  .large-btn {
+    font-size: 1.1em;
+    padding: 15px;
+  }
+  .step-title {
+    font-size: 1.25em;
+  }
+
+  .card {
+    padding: 20px 15px;
+  }
+  .profile-name {
+    font-size: 1.25em;
   }
 }
