@@ -710,15 +710,26 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-}); 
+});
+
+window.clearWeigherSelection = function () {
+  weigherTargetUser = null;
+  document.getElementById("searchResult").innerHTML = "";
+  document.getElementById("liveSearchInput").value = "";
+  document.getElementById("weightInput").value = "";
+  document.getElementById("weighingForm").style.display = "none";
+};
 
 function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
   document.getElementById("searchResult").innerHTML = `
-    Selected: ${userMatch.name} <br> 
-    <span style="font-size: 0.9em; color: var(--text-muted); display: block; margin-top: 5px;">
-      Total Points: <strong style="color: var(--accent-hover); font-size: 1.3em;">${userMatch.points}</strong>
-    </span>`;
+    <div style="background: #f0f5ff; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 15px;">
+      <span style="color: var(--text-muted); font-size: 0.9em;">Selected Student:</span><br>
+      <strong style="color: var(--primary-color); font-size: 1.2em;">${userMatch.name}</strong> <br> 
+      <span style="font-size: 0.9em; color: var(--text-muted); display: block; margin-top: 5px;">
+        Total Points: <strong id="liveUserPoints" style="color: var(--accent-hover); font-size: 1.3em;">${userMatch.points}</strong>
+      </span>
+    </div>`;
   document.getElementById("weighingForm").style.display = "block";
 }
 
@@ -731,7 +742,6 @@ window.processWeighIn = async function () {
   if (isNaN(weight) || weight <= 0)
     return showToast("Error: Weight must be a positive number.", "error");
 
-  // UPDATE: Change to 3 decimal places
   weight = parseFloat(weight.toFixed(3));
 
   const rateConfig = pointRates[material] || { rate: 0 };
@@ -754,8 +764,6 @@ window.processWeighIn = async function () {
 
     const dbField =
       "total" + material.charAt(0).toUpperCase() + material.slice(1);
-
-    // UPDATE: Change to 3 decimal places when saving to the database
     const newMaterialWeight = parseFloat(
       ((freshData[dbField] || 0) + weight).toFixed(3),
     );
@@ -767,17 +775,16 @@ window.processWeighIn = async function () {
       [dbField]: newMaterialWeight,
     });
 
-    showToast(
-      `Success! Awarded ${pointsEarned} pts to ${weigherTargetUser.name}.`,
-      "success",
-    );
+    showToast(`Success! Awarded ${pointsEarned} pts.`, "success");
 
+    // 1. ONLY clear the weight input so they can instantly enter the next item
     document.getElementById("weightInput").value = "";
-    document.getElementById("weighingForm").style.display = "none";
-    document.getElementById("searchResult").innerHTML = "";
-    document.getElementById("liveSearchInput").value = "";
-    weigherTargetUser = null;
 
+    // 2. Update the student's local point counter so the Weigher sees the points go up live!
+    weigherTargetUser.points = newTotalPoints;
+    document.getElementById("liveUserPoints").innerText = newTotalPoints;
+
+    // 3. Keep the form open, do NOT set weigherTargetUser to null yet.
     fetchUsersForSearch();
   } catch (error) {
     showToast("Error saving data. Please try again.", "error");
