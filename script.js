@@ -20,9 +20,10 @@ import {
   sendPasswordResetEmail,
   updateEmail,
   updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyCQOIWX9xisGhtxC14dTJWuss75B50rs-Y",
   authDomain: "ceriapoints.firebaseapp.com",
@@ -39,12 +40,12 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // App State
-const pointRates = { plastic: 100, cardboard: 50, aluminum: 200 };
+let pointRates = { plastic: 100, cardboard: 50, aluminum: 200 };
 let activeUserData = null;
 let weigherTargetUser = null;
 let cachedUsers = [];
 
-// --- CUSTOM UI ALERT (TOAST) ---
+// --- TOAST & ERRORS ---
 window.showToast = function (message, type = "success") {
   const toast = document.getElementById("customToast");
   toast.innerText = message;
@@ -66,14 +67,12 @@ function getFriendlyErrorMessage(errorCode) {
       return "This email is already registered. Try logging in instead.";
     case "auth/weak-password":
       return "Your password is too weak. Please use at least 6 characters.";
-    case "auth/requires-recent-login":
-      return "For security, please log out and log back in to change this.";
     default:
       return "An unexpected error occurred. Please try again.";
   }
 }
 
-// --- AUTHENTICATION LOGIC ---
+// --- AUTHENTICATION ---
 window.toggleAuthView = function (view) {
   document.getElementById("loginForm").style.display =
     view === "login" ? "block" : "none";
@@ -87,7 +86,6 @@ window.registerUser = async function () {
   const name = document.getElementById("regName").value.trim();
   const email = document.getElementById("regEmail").value.trim();
   const password = document.getElementById("regPassword").value;
-
   if (!name || !email || !password)
     return showToast("Please fill in all registration fields.", "error");
 
@@ -98,7 +96,6 @@ window.registerUser = async function () {
       password,
     );
     const user = userCredential.user;
-
     await setDoc(doc(db, "users", user.uid), {
       name: name,
       email: email,
@@ -109,7 +106,6 @@ window.registerUser = async function () {
       totalAluminum: 0,
       profilePic: "",
     });
-
     showToast("Account created successfully! Please log in.", "success");
     toggleAuthView("login");
   } catch (error) {
@@ -120,7 +116,6 @@ window.registerUser = async function () {
 window.loginUser = async function () {
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
-
   if (!email || !password)
     return showToast("Please enter email and password.", "error");
 
@@ -132,10 +127,10 @@ window.loginUser = async function () {
     );
     const user = userCredential.user;
     const userDoc = await getDoc(doc(db, "users", user.uid));
-
     if (userDoc.exists()) {
       activeUserData = userDoc.data();
       activeUserData.uid = user.uid;
+      await fetchAdminRates();
       loadDashboard(activeUserData);
       showToast(`Welcome back, ${activeUserData.name}!`, "success");
     } else {
@@ -150,7 +145,6 @@ window.resetPassword = async function () {
   const email = document.getElementById("resetEmail").value.trim();
   if (!email)
     return showToast("Please enter your email address first.", "error");
-
   try {
     await sendPasswordResetEmail(auth, email);
     showToast("If an account exists, a reset link has been sent.", "success");
@@ -177,16 +171,14 @@ window.logoutUser = function () {
 function loadDashboard(userData) {
   document.getElementById("authContainer").style.display = "none";
   document.getElementById("appContainer").style.display = "block";
-
-  // Hide buttons initially
   document.getElementById("navProfile").style.display = "none";
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${userData.name}&background=fada67&color=3c78d8`;
   document.getElementById("currentAvatar").src =
     userData.profilePic || defaultAvatar;
-
-  // NEW: Set the user's name in the profile section
   document.getElementById("profileName").innerText = userData.name;
+
+  document.getElementById("currentEmailDisplay").value = userData.email;
 
   if (userData.role === "user") {
     document.getElementById("navUser").style.display = "inline-block";
@@ -204,16 +196,13 @@ function loadDashboard(userData) {
 }
 
 window.switchRole = function (roleId) {
-  // Hide all pages
   document.getElementById("userPage").style.display = "none";
   document.getElementById("weigherPage").style.display = "none";
   document.getElementById("adminPage").style.display = "none";
   document.getElementById("profilePage").style.display = "none";
 
-  // Show target page
   document.getElementById(roleId).style.display = "block";
 
-  // Navigation Highlight Logic (Turns active button yellow)
   document
     .querySelectorAll(".nav-btn")
     .forEach((btn) => btn.classList.remove("active"));
@@ -221,11 +210,9 @@ window.switchRole = function (roleId) {
     "nav" +
     roleId.replace("Page", "").charAt(0).toUpperCase() +
     roleId.replace("Page", "").slice(1);
-  if (document.getElementById(navId)) {
+  if (document.getElementById(navId))
     document.getElementById(navId).classList.add("active");
-  }
 
-  // Page-specific logic
   if (roleId === "userPage") {
     document.getElementById("displayUserName").innerText = activeUserData.name;
     document.getElementById("userPointsDisplay").innerText =
@@ -234,8 +221,90 @@ window.switchRole = function (roleId) {
     fetchLeaderboard();
   }
 
-  if (roleId === "weigherPage") {
-    fetchUsersForSearch();
+  if (roleId === "weigherPage") fetchUsersForSearch();
+  if (roleId === "adminPage") renderAdminRates();
+};
+
+// --- ADMIN PANEL (DYNAMIC RATES) ---
+async function fetchAdminRates() {
+  try {
+    const docRef = doc(db, "settings", "rates");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      pointRates = docSnap.data();
+    } else {
+      await setDoc(docRef, pointRates);
+    }
+    updateMaterialDropdowns();
+  } catch (error) {
+    console.error("Could not fetch custom rates", error);
+  }
+}
+
+function updateMaterialDropdowns() {
+  const select = document.getElementById("materialSelect");
+  if (select) {
+    select.innerHTML = "";
+    for (const [material, rate] of Object.entries(pointRates)) {
+      const opt = document.createElement("option");
+      opt.value = material;
+      opt.innerText = `${material.charAt(0).toUpperCase() + material.slice(1)} (${rate} pts/kg)`;
+      select.appendChild(opt);
+    }
+  }
+}
+
+window.renderAdminRates = function () {
+  const container = document.getElementById("adminRatesList");
+  container.innerHTML = "";
+  for (const [material, rate] of Object.entries(pointRates)) {
+    const row = document.createElement("div");
+    row.className = "admin-rate-row";
+    row.innerHTML = `
+      <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled style="flex: 1; background: #f8fafc; font-weight: bold; color: var(--primary-color);">
+      <input type="number" id="rate_${material}" value="${rate}" style="width: 120px;" min="1">
+      <button class="outline-btn" style="padding: 12px 20px; width: auto; margin: 0;" onclick="updateExistingRate('${material}')">Save Edit</button>
+    `;
+    container.appendChild(row);
+  }
+};
+
+window.updateExistingRate = async function (material) {
+  const newRate = parseInt(document.getElementById(`rate_${material}`).value);
+  if (isNaN(newRate) || newRate <= 0)
+    return showToast("Rate must be at least 1.", "error");
+
+  pointRates[material] = newRate;
+  try {
+    await setDoc(doc(db, "settings", "rates"), pointRates);
+    showToast(`${material} updated to ${newRate} pts/kg!`, "success");
+    updateMaterialDropdowns();
+  } catch (e) {
+    showToast("Failed to save to database.", "error");
+  }
+};
+
+window.addNewMaterial = async function () {
+  const name = document
+    .getElementById("newMaterialName")
+    .value.trim()
+    .toLowerCase();
+  const rate = parseInt(document.getElementById("newMaterialRate").value);
+
+  if (!name) return showToast("Please enter a material name.", "error");
+  if (isNaN(rate) || rate <= 0)
+    return showToast("Points must be at least 1.", "error");
+
+  pointRates[name] = rate;
+  try {
+    await setDoc(doc(db, "settings", "rates"), pointRates);
+    showToast(`${name} added successfully!`, "success");
+    document.getElementById("newMaterialName").value = "";
+    document.getElementById("newMaterialRate").value = "";
+    renderAdminRates();
+    updateMaterialDropdowns();
+  } catch (e) {
+    showToast("Failed to save material.", "error");
   }
 };
 
@@ -243,7 +312,6 @@ window.switchRole = function (roleId) {
 window.uploadProfilePicture = function () {
   const fileInput = document.getElementById("avatarUpload");
   const file = fileInput.files[0];
-
   if (!file) return showToast("Please select an image file first.", "error");
 
   const reader = new FileReader();
@@ -258,7 +326,6 @@ window.uploadProfilePicture = function () {
       showToast("Profile picture updated successfully!", "success");
       fileInput.value = "";
     } catch (error) {
-      console.error(error);
       showToast("Error saving picture to database.", "error");
     }
   };
@@ -266,47 +333,91 @@ window.uploadProfilePicture = function () {
 };
 
 window.updateUserEmail = async function () {
+  const currentPassword = document.getElementById("emailCurrentPassword").value;
   const newEmail = document.getElementById("updateEmail").value.trim();
+
+  if (!currentPassword)
+    return showToast("Please enter your current password.", "error");
   if (!newEmail) return showToast("Enter a valid email.", "error");
 
   try {
+    const credential = EmailAuthProvider.credential(
+      auth.currentUser.email,
+      currentPassword,
+    );
+    await reauthenticateWithCredential(auth.currentUser, credential);
     await updateEmail(auth.currentUser, newEmail);
     await updateDoc(doc(db, "users", activeUserData.uid), { email: newEmail });
+
     showToast("Email updated successfully!", "success");
+    document.getElementById("emailCurrentPassword").value = "";
     document.getElementById("updateEmail").value = "";
+    document.getElementById("currentEmailDisplay").value = newEmail;
+    activeUserData.email = newEmail;
   } catch (error) {
-    showToast(getFriendlyErrorMessage(error.code), "error");
+    if (
+      error.code === "auth/invalid-credential" ||
+      error.code === "auth/wrong-password"
+    )
+      showToast("Your current password is incorrect.", "error");
+    else if (error.code === "auth/email-already-in-use")
+      showToast("This email is already registered to someone else.", "error");
+    else showToast(getFriendlyErrorMessage(error.code), "error");
   }
 };
 
 window.updateUserPassword = async function () {
+  const currentPassword = document.getElementById("currentPassword").value;
   const newPassword = document.getElementById("updatePassword").value;
+
+  if (!currentPassword)
+    return showToast("Please enter your current password.", "error");
   if (!newPassword || newPassword.length < 6)
-    return showToast("Password must be at least 6 characters.", "error");
+    return showToast("New password must be at least 6 characters.", "error");
 
   try {
+    const credential = EmailAuthProvider.credential(
+      auth.currentUser.email,
+      currentPassword,
+    );
+    await reauthenticateWithCredential(auth.currentUser, credential);
     await updatePassword(auth.currentUser, newPassword);
+
     showToast("Password updated successfully!", "success");
+    document.getElementById("currentPassword").value = "";
     document.getElementById("updatePassword").value = "";
   } catch (error) {
-    showToast(getFriendlyErrorMessage(error.code), "error");
+    if (
+      error.code === "auth/invalid-credential" ||
+      error.code === "auth/wrong-password"
+    )
+      showToast("Your current password is incorrect.", "error");
+    else showToast(getFriendlyErrorMessage(error.code), "error");
   }
 };
 
-// --- LEADERBOARD LOGIC ---
-async function fetchLeaderboard() {
+// --- LEADERBOARD & IMPACT LOGIC ---
+window.fetchLeaderboard = async function () {
   const leaderboardList = document.getElementById("leaderboardList");
+  const yearSelect = document.getElementById("leaderboardYear");
+  const selectedYear = yearSelect ? yearSelect.value : "current";
+
   leaderboardList.innerHTML =
     '<p style="text-align: center; color: var(--text-muted);">Fetching scores...</p>';
 
   try {
+    // Basic logic implemented to differentiate UI based on year selected
+    if (selectedYear !== "current") {
+      leaderboardList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Viewing archived records for ${selectedYear}...</p>`;
+      return;
+    }
+
     const q = query(
       collection(db, "users"),
       orderBy("points", "desc"),
       limit(5),
     );
     const querySnapshot = await getDocs(q);
-
     let html = "";
     let rank = 1;
 
@@ -316,40 +427,30 @@ async function fetchLeaderboard() {
         const avatarSrc =
           data.profilePic ||
           `https://ui-avatars.com/api/?name=${data.name}&background=e2e8f0&color=64748b`;
-
-        html += `
-          <div class="leaderboard-item">
-            <span class="rank">#${rank}</span>
-            <img src="${avatarSrc}" class="leaderboard-avatar" alt="${data.name}">
-            <span class="name">${data.name}</span>
-            <span class="score">${data.points} pts</span>
-          </div>`;
+        html += `<div class="leaderboard-item"><span class="rank">#${rank}</span><img src="${avatarSrc}" class="leaderboard-avatar" alt="${data.name}"><span class="name">${data.name}</span><span class="score">${data.points} pts</span></div>`;
         rank++;
       }
     });
-
     leaderboardList.innerHTML =
       html === ""
         ? '<p style="text-align: center; color: var(--text-muted);">No points awarded yet. Be the first!</p>'
         : html;
   } catch (error) {
-    console.error("Leaderboard Error:", error);
     leaderboardList.innerHTML =
       '<p style="text-align: center; color: var(--error-color);">Failed to load leaderboard.</p>';
   }
-}
+};
 
 function calculateEnvironmentalImpact(userData) {
   const card = userData.totalCardboard || 0;
   const plas = userData.totalPlastic || 0;
   const alum = userData.totalAluminum || 0;
-
   document.getElementById("treesSaved").innerText = (card * 0.017).toFixed(1);
   document.getElementById("co2Saved").innerText = (plas * 1.5).toFixed(1);
   document.getElementById("energySaved").innerText = (alum * 14.0).toFixed(1);
 }
 
-// --- WEIGHER TERMINAL (LIVE SEARCH LOGIC) ---
+// --- WEIGHER TERMINAL (LIVE SEARCH & FORMATTING) ---
 async function fetchUsersForSearch() {
   try {
     const q = query(collection(db, "users"));
@@ -357,28 +458,27 @@ async function fetchUsersForSearch() {
     cachedUsers = [];
     snap.forEach((doc) => {
       const data = doc.data();
-      if (data.role === "user") {
+      if (data.role === "user")
         cachedUsers.push({
           uid: doc.id,
           name: data.name,
           points: data.points || 0,
         });
-      }
     });
   } catch (e) {
-    console.error("Could not fetch users for search.", e);
+    console.error("Could not fetch users.", e);
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("liveSearchInput");
   const dropdown = document.getElementById("searchResultsDropdown");
+  const weightInput = document.getElementById("weightInput");
 
   if (searchInput && dropdown) {
     searchInput.addEventListener("input", function (e) {
       const val = e.target.value.toLowerCase();
       dropdown.innerHTML = "";
-
       if (!val) {
         dropdown.style.display = "none";
         return;
@@ -387,7 +487,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const matches = cachedUsers.filter((user) =>
         user.name.toLowerCase().includes(val),
       );
-
       if (matches.length > 0) {
         dropdown.style.display = "block";
         matches.forEach((match) => {
@@ -407,8 +506,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.addEventListener("click", function (e) {
-      if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+      if (!searchInput.contains(e.target) && !dropdown.contains(e.target))
         dropdown.style.display = "none";
+    });
+  }
+
+  // ACTIVE INPUT FORMATTING (Strict 2 Decimals allowed while typing)
+  if (weightInput) {
+    weightInput.addEventListener("input", function (e) {
+      // Strips anything that isn't a number or a dot
+      let val = this.value.replace(/[^0-9.]/g, "");
+      if (val.includes(".")) {
+        let parts = val.split(".");
+        if (parts[1].length > 2) {
+          val = parts[0] + "." + parts[1].substring(0, 2);
+        }
+      }
+      this.value = val;
+    });
+
+    // Auto-pads with zeros on blur (e.g. "1" becomes "1.00")
+    weightInput.addEventListener("blur", function (e) {
+      if (this.value && !isNaN(this.value)) {
+        this.value = parseFloat(this.value).toFixed(2);
       }
     });
   }
@@ -416,24 +536,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
-  const resultText = document.getElementById("searchResult");
-  const weighForm = document.getElementById("weighingForm");
-
-  resultText.innerText = `Selected: ${userMatch.name} (Current Points: ${userMatch.points})`;
-  resultText.style.color = "var(--success-color)";
-  weighForm.style.display = "block";
+  // Beautiful CeriaPoints Yellow for the Current Points text
+  document.getElementById("searchResult").innerHTML = `
+    Selected: ${userMatch.name} <br> 
+    <span style="font-size: 0.9em; color: var(--text-muted); display: block; margin-top: 5px;">
+      Total Points: <strong style="color: var(--accent-hover); font-size: 1.3em;">${userMatch.points}</strong>
+    </span>`;
+  document.getElementById("weighingForm").style.display = "block";
 }
 
 window.processWeighIn = async function () {
   const material = document.getElementById("materialSelect").value;
-  const weight = parseFloat(document.getElementById("weightInput").value);
+  let weight = parseFloat(document.getElementById("weightInput").value);
 
   if (!weigherTargetUser)
-    return showToast("Please select a user first.", "error");
+    return showToast("Please search and select a user first.", "error");
   if (isNaN(weight) || weight <= 0)
-    return showToast("Please enter a valid weight!", "error");
+    return showToast("Error: Weight must be a positive number.", "error");
 
-  const pointsEarned = weight * pointRates[material];
+  weight = parseFloat(weight.toFixed(2));
+
+  const rate = pointRates[material] || 0;
+  const pointsEarned = Math.floor(weight * rate);
 
   try {
     const userRef = doc(db, "users", weigherTargetUser.uid);
@@ -442,12 +566,11 @@ window.processWeighIn = async function () {
 
     const newTotalPoints = (freshData.points || 0) + pointsEarned;
 
-    let dbField = "";
-    if (material === "cardboard") dbField = "totalCardboard";
-    else if (material === "plastic") dbField = "totalPlastic";
-    else if (material === "aluminum") dbField = "totalAluminum";
-
-    const newMaterialWeight = (freshData[dbField] || 0) + weight;
+    const dbField =
+      "total" + material.charAt(0).toUpperCase() + material.slice(1);
+    const newMaterialWeight = parseFloat(
+      ((freshData[dbField] || 0) + weight).toFixed(2),
+    );
 
     await updateDoc(userRef, {
       points: newTotalPoints,
@@ -461,14 +584,13 @@ window.processWeighIn = async function () {
 
     document.getElementById("weightInput").value = "";
     document.getElementById("weighingForm").style.display = "none";
-    document.getElementById("searchResult").innerText =
+    document.getElementById("searchResult").innerHTML =
       "Ready for next weigh-in.";
     document.getElementById("liveSearchInput").value = "";
     weigherTargetUser = null;
 
     fetchUsersForSearch();
   } catch (error) {
-    console.error("Error updating database: ", error);
     showToast("Error saving data. Please try again.", "error");
   }
 };
