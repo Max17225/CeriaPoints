@@ -9,7 +9,6 @@ import {
   collection,
   query,
   orderBy,
-  limit,
   getDocs,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import {
@@ -22,6 +21,7 @@ import {
   updatePassword,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -39,7 +39,7 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// NEW: Highly Scalable Object Structure for Rates & Math
+// Highly Scalable Object Structure for Rates & Math
 let pointRates = {
   plastic: { rate: 100, impactType: "co2", multiplier: 1.5 },
   cardboard: { rate: 50, impactType: "trees", multiplier: 0.017 },
@@ -159,21 +159,16 @@ window.resetPassword = async function () {
   }
 };
 
-// --- CUSTOM LOGOUT LOGIC ---
 window.logoutUser = function () {
-  // Shows our custom modal instead of the default browser alert
   document.getElementById("logoutModal").style.display = "flex";
 };
 
 window.closeLogoutModal = function () {
-  // Hides the modal if they click cancel
   document.getElementById("logoutModal").style.display = "none";
 };
 
 window.confirmLogout = function () {
-  // Actually logs them out if they click the red Log Out button
   document.getElementById("logoutModal").style.display = "none";
-
   signOut(auth).then(() => {
     document.getElementById("appContainer").style.display = "none";
     document.getElementById("authContainer").style.display = "flex";
@@ -185,6 +180,26 @@ window.confirmLogout = function () {
     showToast("Logged out successfully.", "success");
   });
 };
+
+// AUTO-LOGIN PERSISTENCE
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        activeUserData = userDoc.data();
+        activeUserData.uid = user.uid;
+        await fetchAdminRates();
+        loadDashboard(activeUserData);
+      }
+    } catch (error) {
+      console.error("Error fetching user session:", error);
+    }
+  } else {
+    document.getElementById("appContainer").style.display = "none";
+    document.getElementById("authContainer").style.display = "flex";
+  }
+});
 
 // --- APP ROUTING & DASHBOARD ---
 function loadDashboard(userData) {
@@ -251,7 +266,6 @@ async function fetchAdminRates() {
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Check for legacy flat format and upgrade if needed
       if (typeof data.plastic === "number") {
         await setDoc(docRef, pointRates);
       } else {
@@ -285,13 +299,20 @@ window.renderAdminRates = function () {
   for (const [material, data] of Object.entries(pointRates)) {
     const row = document.createElement("div");
     row.className = "admin-rate-row";
+
+    // NEW: Added the Impact Type dropdown directly to the live edit rows
     row.innerHTML = `
-      <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled>
-      <div class="rate-inputs">
+      <input type="text" value="${material.charAt(0).toUpperCase() + material.slice(1)}" disabled style="min-width: 80px;">
+      <div class="rate-inputs" style="flex-wrap: wrap;">
         <span style="font-size:0.85em; color:var(--text-muted);">Rate:</span>
-        <input type="number" id="rate_${material}" value="${data.rate}" min="1">
+        <input type="number" id="rate_${material}" value="${data.rate}" min="1" style="width: 70px;">
         <span style="font-size:0.85em; color:var(--text-muted); margin-left:5px;">Mult:</span>
-        <input type="number" id="mult_${material}" value="${data.multiplier}" step="0.001" min="0">
+        <input type="number" id="mult_${material}" value="${data.multiplier}" step="0.001" min="0" style="width: 75px;">
+        <select id="impact_${material}" style="width: auto; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <option value="trees" ${data.impactType === "trees" ? "selected" : ""}>Trees</option>
+            <option value="co2" ${data.impactType === "co2" ? "selected" : ""}>CO2</option>
+            <option value="energy" ${data.impactType === "energy" ? "selected" : ""}>Energy</option>
+        </select>
       </div>
       <button class="outline-btn small-btn" style="margin: 0;" onclick="updateExistingRate('${material}')">Save</button>
     `;
@@ -302,6 +323,7 @@ window.renderAdminRates = function () {
 window.updateExistingRate = async function (material) {
   const newRate = parseInt(document.getElementById(`rate_${material}`).value);
   const newMult = parseFloat(document.getElementById(`mult_${material}`).value);
+  const newImpact = document.getElementById(`impact_${material}`).value; // Grabs the newly selected dropdown
 
   if (isNaN(newRate) || newRate <= 0)
     return showToast("Rate must be at least 1.", "error");
@@ -310,6 +332,8 @@ window.updateExistingRate = async function (material) {
 
   pointRates[material].rate = newRate;
   pointRates[material].multiplier = newMult;
+  pointRates[material].impactType = newImpact; // Saves the impact type
+
   try {
     await setDoc(doc(db, "settings", "rates"), pointRates);
     showToast(`${material} updated successfully!`, "success");
@@ -378,7 +402,7 @@ window.uploadProfilePicture = function () {
 
 window.updateUserEmail = async function () {
   const currentPassword = document.getElementById("emailCurrentPassword").value;
-  const newEmail = document.getElementById("updateEmail").value.trim();
+  const newEmail = document.getElementById("newEmailInput").value.trim();
 
   if (!currentPassword)
     return showToast("Please enter your current password.", "error");
@@ -395,7 +419,7 @@ window.updateUserEmail = async function () {
 
     showToast("Email updated successfully!", "success");
     document.getElementById("emailCurrentPassword").value = "";
-    document.getElementById("updateEmail").value = "";
+    document.getElementById("newEmailInput").value = "";
     document.getElementById("currentEmailDisplay").value = newEmail;
     activeUserData.email = newEmail;
   } catch (error) {
@@ -412,7 +436,8 @@ window.updateUserEmail = async function () {
 
 window.updateUserPassword = async function () {
   const currentPassword = document.getElementById("currentPassword").value;
-  const newPassword = document.getElementById("updatePassword").value;
+  // FIX: Swapped to the new collision-free ID
+  const newPassword = document.getElementById("newPasswordInput").value;
 
   if (!currentPassword)
     return showToast("Please enter your current password.", "error");
@@ -429,7 +454,7 @@ window.updateUserPassword = async function () {
 
     showToast("Password updated successfully!", "success");
     document.getElementById("currentPassword").value = "";
-    document.getElementById("updatePassword").value = "";
+    document.getElementById("newPasswordInput").value = "";
   } catch (error) {
     if (
       error.code === "auth/invalid-credential" ||
@@ -443,22 +468,28 @@ window.updateUserPassword = async function () {
 // --- LEADERBOARD & IMPACT MATH ---
 window.fetchLeaderboard = async function () {
   const leaderboardList = document.getElementById("leaderboardList");
+  const yearSelect = document.getElementById("leaderboardYear");
+  const selectedYear = yearSelect ? yearSelect.value : "current";
+
   leaderboardList.innerHTML =
     '<p style="text-align: center; color: var(--text-muted);">Fetching scores...</p>';
 
   try {
-    const q = query(
-      collection(db, "users"),
-      orderBy("points", "desc"),
-      limit(5),
-    );
+    if (selectedYear !== "current") {
+      leaderboardList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Viewing archived records for ${selectedYear}...</p>`;
+      return;
+    }
+
+    // FIX: Removed the limit(5) so EVERYONE shows up!
+    const q = query(collection(db, "users"), orderBy("points", "desc"));
     const querySnapshot = await getDocs(q);
     let html = "";
     let rank = 1;
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.role === "user" && data.points > 0) {
+      // FIX: Removed the data.points > 0 requirement so people with 0 show up at the bottom
+      if (data.role === "user") {
         const avatarSrc =
           data.profilePic ||
           `https://ui-avatars.com/api/?name=${data.name}&background=e2e8f0&color=64748b`;
@@ -468,7 +499,7 @@ window.fetchLeaderboard = async function () {
     });
     leaderboardList.innerHTML =
       html === ""
-        ? '<p style="text-align: center; color: var(--text-muted);">No points awarded yet. Be the first!</p>'
+        ? '<p style="text-align: center; color: var(--text-muted);">No users found.</p>'
         : html;
   } catch (error) {
     leaderboardList.innerHTML =
@@ -476,13 +507,11 @@ window.fetchLeaderboard = async function () {
   }
 };
 
-// NEW: Highly Scalable Dynamic Environmental Math
 function calculateEnvironmentalImpact(userData) {
   let totalTrees = 0;
   let totalCO2 = 0;
   let totalEnergy = 0;
 
-  // Loops through every material defined in the Admin panel and calculates total
   for (const [material, config] of Object.entries(pointRates)) {
     const dbField =
       "total" + material.charAt(0).toUpperCase() + material.slice(1);
@@ -602,7 +631,6 @@ window.processWeighIn = async function () {
 
   weight = parseFloat(weight.toFixed(2));
 
-  // Points calculated against the dynamic object
   const rateConfig = pointRates[material] || { rate: 0 };
   const pointsEarned = Math.floor(weight * rateConfig.rate);
 

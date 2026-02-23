@@ -180,12 +180,14 @@ body {
   max-width: 750px;
   margin: 40px auto;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .app-header-wrapper {
   background-color: var(--primary-color);
   padding: 25px 30px 20px 30px;
+  border-top-left-radius: 16px; 
+  border-top-right-radius: 16px; 
 }
 .app-header {
   display: flex;
@@ -836,8 +838,8 @@ select:focus {
   }
 
   .impact-grid {
-    grid-template-columns: 1fr; 
-    gap: 5px; 
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 
   .impact-card {
