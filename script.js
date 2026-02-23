@@ -707,8 +707,8 @@ document.addEventListener("DOMContentLoaded", () => {
       let val = this.value.replace(/[^0-9.]/g, "");
       if (val.includes(".")) {
         let parts = val.split(".");
-        if (parts[1].length > 2) {
-          val = parts[0] + "." + parts[1].substring(0, 2);
+        if (parts[1].length > 3) {
+          val = parts[0] + "." + parts[1].substring(0, 3);
         }
       }
       this.value = val;
@@ -716,11 +716,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     weightInput.addEventListener("blur", function (e) {
       if (this.value && !isNaN(this.value)) {
-        this.value = parseFloat(this.value).toFixed(2);
+        this.value = parseFloat(this.value).toFixed(3);
       }
     });
   }
-});
+}); // <-- THIS IS THE MISSING BRACKET I ADDED!
 
 function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
@@ -741,12 +741,12 @@ window.processWeighIn = async function () {
   if (isNaN(weight) || weight <= 0)
     return showToast("Error: Weight must be a positive number.", "error");
 
-  weight = parseFloat(weight.toFixed(2));
+  // UPDATE: Change to 3 decimal places
+  weight = parseFloat(weight.toFixed(3));
 
   const rateConfig = pointRates[material] || { rate: 0 };
   const pointsEarned = Math.floor(weight * rateConfig.rate);
 
-  // Create a strict string for the current month (e.g., "2026-02")
   const date = new Date();
   const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
 
@@ -755,20 +755,19 @@ window.processWeighIn = async function () {
     const freshUserDoc = await getDoc(userRef);
     const freshData = freshUserDoc.data();
 
-    // 1. ADD TO YEARLY (Accumulated)
     const newTotalPoints = (freshData.points || 0) + pointsEarned;
 
-    // 2. CHECK & ADD TO MONTHLY (The "Lazy Reset" trick)
     let newMonthlyPoints = pointsEarned;
     if (freshData.lastMonthUpdated === currentMonthStr) {
-      // If they already have points this month, add to it!
       newMonthlyPoints += freshData.currentMonthPoints || 0;
-    } // If it's a new month, it just ignores old points and starts fresh at `pointsEarned`!
+    }
 
     const dbField =
       "total" + material.charAt(0).toUpperCase() + material.slice(1);
+
+    // UPDATE: Change to 3 decimal places when saving to the database
     const newMaterialWeight = parseFloat(
-      ((freshData[dbField] || 0) + weight).toFixed(2),
+      ((freshData[dbField] || 0) + weight).toFixed(3),
     );
 
     await updateDoc(userRef, {
