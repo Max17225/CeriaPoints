@@ -2,6 +2,8 @@
 
 CeriaPoints is a sustainable, community-focused web application designed specifically for the Tadika Matahari Ceria kindergarten. This project aims to encourage students and parents to recycle by turning waste management into a fun, gamified experience.
 
+**🌐 Live Web App Available on:** [https://ceriapoints.vercel.app/](https://ceriapoints.vercel.app/)
+
 ## 🚀 Project Motivation
 
 I built CeriaPoints as a **personal self-study project** to dive into full-stack web development. My goal was to move beyond static web pages and learn how to build a dynamic, data-driven application from scratch. 
@@ -28,17 +30,3 @@ This project was built using a lightweight, vanilla tech stack to focus heavily 
 **Backend (Firebase as a Service):**
 * **Firebase Authentication:** Secure user login, registration, and email/password management.
 * **Cloud Firestore (NoSQL):** Real-time database to store user profiles, recycling history, and live admin configurations.
-
-## 🧠 What I Learned
-
-Building CeriaPoints taught me several valuable software engineering concepts:
-1.  **State Management:** Handling real-time data updates between the database and the UI.
-2.  **Input Sanitization:** Preventing bugs by strictly formatting user inputs (e.g., forcing 2-decimal floats for weights).
-3.  **Database Scalability:** Designing NoSQL document structures that allow for new features (like custom materials) without requiring destructive database migrations.
-4.  **Responsive Design:** Using modern CSS Grid and Flexbox with media queries to ensure the app works flawlessly on desktops, tablets, and mobile phones.
-
-## 🚀 How to Run Locally
-
-1. Clone this repository:
-   ```bash
-   git clone [https://github.com/YourUsername/CeriaPoints.git](https://github.com/YourUsername/CeriaPoints.git)
