@@ -198,7 +198,6 @@ window.confirmLogout = function () {
 
 // AUTO-LOGIN PERSISTENCE
 onAuthStateChanged(auth, async (user) => {
-  // If a registration is currently happening, completely ignore this!
   if (isRegistering) return;
 
   if (user) {
@@ -209,11 +208,19 @@ onAuthStateChanged(auth, async (user) => {
         activeUserData.uid = user.uid;
         await fetchAdminRates();
         loadDashboard(activeUserData);
+
+        // HIDE LOADER, USER IS LOGGED IN
+        document.getElementById("initialLoader").style.display = "none";
       }
     } catch (error) {
       console.error("Error fetching user session:", error);
+      // ERROR FALLBACK
+      document.getElementById("initialLoader").style.display = "none";
+      document.getElementById("authContainer").style.display = "flex";
     }
   } else {
+    // HIDE LOADER, SHOW LOGIN PAGE (NOBODY IS LOGGED IN)
+    document.getElementById("initialLoader").style.display = "none";
     document.getElementById("appContainer").style.display = "none";
     document.getElementById("authContainer").style.display = "flex";
   }
