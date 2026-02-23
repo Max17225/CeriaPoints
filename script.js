@@ -416,22 +416,65 @@ window.addNewMaterial = async function () {
 window.uploadProfilePicture = function () {
   const fileInput = document.getElementById("avatarUpload");
   const file = fileInput.files[0];
-  if (!file) return showToast("Please select an image file first.", "error");
+  if (!file) return; // Silent return if they close the picker without choosing
+
+  // Loosened check: As long as it claims to be an image, let Android try it
+  if (!file.type.startsWith("image/")) {
+    showToast("Please select a valid image file.", "error");
+    fileInput.value = "";
+    return;
+  }
 
   const reader = new FileReader();
-  reader.onloadend = async function () {
-    const base64String = reader.result;
-    try {
-      await updateDoc(doc(db, "users", activeUserData.uid), {
-        profilePic: base64String,
-      });
-      document.getElementById("currentAvatar").src = base64String;
-      activeUserData.profilePic = base64String;
-      showToast("Profile picture updated successfully!", "success");
+  reader.onload = function (event) {
+    const img = new Image();
+
+    img.onerror = function () {
+      showToast("Could not read this specific photo format.", "error");
       fileInput.value = "";
-    } catch (error) {
-      showToast("Error saving picture to database.", "error");
-    }
+    };
+
+    img.onload = async function () {
+      const canvas = document.createElement("canvas");
+      const MAX_WIDTH = 300;
+      const MAX_HEIGHT = 300;
+      let width = img.width;
+      let height = img.height;
+
+      // Smart scaling
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+
+      try {
+        await updateDoc(doc(db, "users", activeUserData.uid), {
+          profilePic: compressedBase64,
+        });
+        document.getElementById("currentAvatar").src = compressedBase64;
+        activeUserData.profilePic = compressedBase64;
+        showToast("Profile picture updated successfully!", "success");
+        fileInput.value = "";
+      } catch (error) {
+        // DIAGNOSTIC FIX: Show the exact raw error on your phone screen!
+        showToast("DB ERROR: " + error.message, "error");
+      }
+    };
+    img.src = event.target.result;
   };
   reader.readAsDataURL(file);
 };
