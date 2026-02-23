@@ -503,38 +503,74 @@ window.updateUserPassword = async function () {
 // --- LEADERBOARD & IMPACT MATH ---
 window.fetchLeaderboard = async function () {
   const leaderboardList = document.getElementById("leaderboardList");
-  const yearSelect = document.getElementById("leaderboardYear");
-  const selectedYear = yearSelect ? yearSelect.value : "current";
+  const filterDropdown = document.getElementById("leaderboardFilter");
+  const filterMode = filterDropdown ? filterDropdown.value : "monthly";
 
   leaderboardList.innerHTML =
     '<p style="text-align: center; color: var(--text-muted);">Fetching scores...</p>';
 
-  try {
-    if (selectedYear !== "current") {
-      leaderboardList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Viewing archived records for ${selectedYear}...</p>`;
-      return;
-    }
+  const date = new Date();
+  const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
 
-    const q = query(collection(db, "users"), orderBy("points", "desc"));
+  try {
+    // Fetch all users to sort them instantly in Javascript
+    const q = query(collection(db, "users"));
     const querySnapshot = await getDocs(q);
-    let html = "";
-    let rank = 1;
+
+    let usersArray = [];
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data.role === "user") {
-        const avatarSrc =
-          data.profilePic ||
-          `https://ui-avatars.com/api/?name=${data.name}&background=e2e8f0&color=64748b`;
-        html += `<div class="leaderboard-item"><span class="rank">#${rank}</span><img src="${avatarSrc}" class="leaderboard-avatar" alt="${data.name}"><span class="name">${data.name}</span><span class="score">${data.points} pts</span></div>`;
-        rank++;
+        // Determine monthly points safely using the timestamp check
+        let monthlyPts =
+          data.lastMonthUpdated === currentMonthStr
+            ? data.currentMonthPoints || 0
+            : 0;
+        let yearlyPts = data.points || 0;
+
+        let displayScore = filterMode === "monthly" ? monthlyPts : yearlyPts;
+
+        usersArray.push({
+          name: data.name,
+          profilePic: data.profilePic,
+          score: displayScore,
+        });
       }
     });
-    leaderboardList.innerHTML =
-      html === ""
-        ? '<p style="text-align: center; color: var(--text-muted);">No users found.</p>'
-        : html;
+
+    // Sort the users from highest score to lowest
+    usersArray.sort((a, b) => b.score - a.score);
+
+    let html = "";
+    let rank = 1;
+
+    // Build the UI
+    for (let i = 0; i < usersArray.length; i++) {
+      const user = usersArray[i];
+
+      // Optional: Skip users who have 0 points for this specific view
+      if (user.score <= 0) continue;
+
+      const avatarSrc =
+        user.profilePic ||
+        `https://ui-avatars.com/api/?name=${user.name}&background=e2e8f0&color=64748b`;
+      html += `<div class="leaderboard-item">
+                  <span class="rank">#${rank}</span>
+                  <img src="${avatarSrc}" class="leaderboard-avatar" alt="${user.name}">
+                  <span class="name">${user.name}</span>
+                  <span class="score">${user.score} pts</span>
+                </div>`;
+      rank++;
+    }
+
+    if (html === "") {
+      html = `<p style="text-align: center; color: var(--text-muted); margin-top: 15px;">No points recorded for this period yet.</p>`;
+    }
+
+    leaderboardList.innerHTML = html;
   } catch (error) {
+    console.error(error);
     leaderboardList.innerHTML =
       '<p style="text-align: center; color: var(--error-color);">Failed to load leaderboard.</p>';
   }
@@ -667,12 +703,24 @@ window.processWeighIn = async function () {
   const rateConfig = pointRates[material] || { rate: 0 };
   const pointsEarned = Math.floor(weight * rateConfig.rate);
 
+  // Create a strict string for the current month (e.g., "2026-02")
+  const date = new Date();
+  const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
+
   try {
     const userRef = doc(db, "users", weigherTargetUser.uid);
     const freshUserDoc = await getDoc(userRef);
     const freshData = freshUserDoc.data();
 
+    // 1. ADD TO YEARLY (Accumulated)
     const newTotalPoints = (freshData.points || 0) + pointsEarned;
+
+    // 2. CHECK & ADD TO MONTHLY (The "Lazy Reset" trick)
+    let newMonthlyPoints = pointsEarned;
+    if (freshData.lastMonthUpdated === currentMonthStr) {
+      // If they already have points this month, add to it!
+      newMonthlyPoints += freshData.currentMonthPoints || 0;
+    } // If it's a new month, it just ignores old points and starts fresh at `pointsEarned`!
 
     const dbField =
       "total" + material.charAt(0).toUpperCase() + material.slice(1);
@@ -682,6 +730,8 @@ window.processWeighIn = async function () {
 
     await updateDoc(userRef, {
       points: newTotalPoints,
+      currentMonthPoints: newMonthlyPoints,
+      lastMonthUpdated: currentMonthStr,
       [dbField]: newMaterialWeight,
     });
 

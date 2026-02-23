@@ -395,7 +395,7 @@
               <span>Top Recyclers</span>
 
               <select
-                id="leaderboardYear"
+                id="leaderboardFilter"
                 onchange="fetchLeaderboard()"
                 style="
                   width: auto;
@@ -405,9 +405,13 @@
                   border-radius: 20px;
                   font-weight: bold;
                   color: var(--primary-color);
+                  border: 2px solid var(--primary-color);
+                  background-color: #f0f5ff;
+                  cursor: pointer;
                 "
               >
-                <option value="current">2026 (Current)</option>
+                <option value="monthly">This Month</option>
+                <option value="yearly">All-Time (Yearly)</option>
               </select>
 
               <svg
@@ -618,7 +622,7 @@
             <input
               type="file"
               id="avatarUpload"
-              accept="image/*"
+              accept="image/*, image/heic, image/heif, .jpg, .jpeg, .png, .webp"
               class="hidden-file-input"
               onchange="uploadProfilePicture()"
             />
