@@ -321,6 +321,10 @@ function updateMaterialDropdowns() {
   const select = document.getElementById("materialSelect");
   if (select) {
     select.innerHTML = "";
+
+    select.innerHTML =
+      '<option value="" disabled selected>Select Material...</option>';
+
     for (const [material, data] of Object.entries(pointRates)) {
       const opt = document.createElement("option");
       opt.value = material;
@@ -736,6 +740,10 @@ function selectUserForWeighIn(userMatch) {
 window.processWeighIn = async function () {
   const material = document.getElementById("materialSelect").value;
   let weight = parseFloat(document.getElementById("weightInput").value);
+
+  if (!material || material === "") {
+    return showToast("Please select a material first.", "error");
+  }
 
   if (!weigherTargetUser)
     return showToast("Please search and select a user first.", "error");
