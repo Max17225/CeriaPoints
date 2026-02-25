@@ -560,22 +560,22 @@ window.fetchLeaderboard = async function () {
   const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
 
   try {
-    // Fetch all users to sort them instantly in Javascript
     const q = query(collection(db, "users"));
     const querySnapshot = await getDocs(q);
 
     let usersArray = [];
+    let globalTrees = 0;
+    let globalCO2 = 0;
+    let globalEnergy = 0;
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data.role === "user") {
-        // Determine monthly points safely using the timestamp check
         let monthlyPts =
           data.lastMonthUpdated === currentMonthStr
             ? data.currentMonthPoints || 0
             : 0;
         let yearlyPts = data.points || 0;
-
         let displayScore = filterMode === "monthly" ? monthlyPts : yearlyPts;
 
         usersArray.push({
@@ -583,8 +583,31 @@ window.fetchLeaderboard = async function () {
           profilePic: data.profilePic,
           score: displayScore,
         });
+
+        for (const [material, config] of Object.entries(pointRates)) {
+          const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
+          const dbField =
+            "total" +
+            safeMaterial.charAt(0).toUpperCase() +
+            safeMaterial.slice(1);
+          const userWeight = data[dbField] || 0;
+
+          if (config.impactType === "trees")
+            globalTrees += userWeight * config.multiplier;
+          if (config.impactType === "co2")
+            globalCO2 += userWeight * config.multiplier;
+          if (config.impactType === "energy")
+            globalEnergy += userWeight * config.multiplier;
+        }
       }
     });
+
+    const gTreesEl = document.getElementById("globalTreesSaved");
+    const gCo2El = document.getElementById("globalCo2Saved");
+    const gEnergyEl = document.getElementById("globalEnergySaved");
+    if (gTreesEl) gTreesEl.innerText = globalTrees.toFixed(1);
+    if (gCo2El) gCo2El.innerText = globalCO2.toFixed(1);
+    if (gEnergyEl) gEnergyEl.innerText = globalEnergy.toFixed(1);
 
     // Sort the users from highest score to lowest
     usersArray.sort((a, b) => b.score - a.score);
@@ -629,8 +652,10 @@ function calculateEnvironmentalImpact(userData) {
   let totalEnergy = 0;
 
   for (const [material, config] of Object.entries(pointRates)) {
+    const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
     const dbField =
-      "total" + material.charAt(0).toUpperCase() + material.slice(1);
+      "total" + safeMaterial.charAt(0).toUpperCase() + safeMaterial.slice(1);
+
     const userWeight = userData[dbField] || 0;
 
     if (config.impactType === "trees")
@@ -770,8 +795,10 @@ window.processWeighIn = async function () {
       newMonthlyPoints += freshData.currentMonthPoints || 0;
     }
 
+    const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
     const dbField =
-      "total" + material.charAt(0).toUpperCase() + material.slice(1);
+      "total" + safeMaterial.charAt(0).toUpperCase() + safeMaterial.slice(1);
+
     const newMaterialWeight = parseFloat(
       ((freshData[dbField] || 0) + weight).toFixed(3),
     );
