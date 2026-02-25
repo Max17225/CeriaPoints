@@ -728,7 +728,7 @@ function selectUserForWeighIn(userMatch) {
   weigherTargetUser = userMatch;
   document.getElementById("searchResult").innerHTML = `
     <div style="background: #f0f5ff; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 15px;">
-      <span style="color: var(--text-muted); font-size: 0.9em;">Selected Student:</span><br>
+      <span style="color: var(--text-muted); font-size: 0.9em;">Selected User:</span><br>
       <strong style="color: var(--primary-color); font-size: 1.2em;">${userMatch.name}</strong> <br> 
       <span style="font-size: 0.9em; color: var(--text-muted); display: block; margin-top: 5px;">
         Total Points: <strong id="liveUserPoints" style="color: var(--accent-hover); font-size: 1.3em;">${userMatch.points}</strong>
