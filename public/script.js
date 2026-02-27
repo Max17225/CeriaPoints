@@ -731,7 +731,9 @@ window.exportLeaderboardCSV = async function () {
     exportData.sort((a, b) => b.score - a.score);
 
     let periodLabel =
-      filterMode === "monthly" ? "Monthly Points" : "All-Time Points";
+      filterMode === "monthly"
+        ? "This Month's Total Points"
+        : "This Year's Total Points";
 
     let csvContent = `Report Generated On:,${dateString}\n`;
     csvContent += `Total Trees Saved:,${globalTrees.toFixed(1)}\n`;
