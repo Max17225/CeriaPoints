@@ -653,7 +653,7 @@ body {
   }
 }
 
-/* --- ACCESSIBLE WEIGHER TERMINAL (Senior-Friendly) --- */
+/* --- WEIGHER TERMINAL --- */
 .step-title {
   display: flex;
   align-items: center;
@@ -861,7 +861,6 @@ select:focus {
   color: var(--primary-color);
 }
 
-/* --- TOAST --- */
 .toast {
   visibility: hidden;
   min-width: 250px;
@@ -934,7 +933,7 @@ select:focus {
 }
 
 /* ==========================================================================
-   IPAD / TABLET RESPONSIVENESS (Fixes cut-off text on medium screens)
+   IPAD / TABLET RESPONSIVENESS 
    ========================================================================== */
 @media (min-width: 769px) and (max-width: 1024px) {
   .impact-card {
@@ -1038,29 +1037,27 @@ select:focus {
     transform: translateY(2px);
   }
 
-  /* --- FIX: OPTIMIZED IMPACT CARDS FOR MOBILE --- */
   .impact-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px; /* Very tight gap so they fit */
+    gap: 6px;
   }
   .impact-card {
-    padding: 15px 5px; /* Less internal padding */
+    padding: 15px 5px;
   }
   .impact-icon {
-    width: 28px; /* Smaller icon */
+    width: 28px;
     height: 28px;
     margin-bottom: 8px;
   }
   .impact-number {
-    font-size: 1.3em; /* Shrunk down so 3-digit numbers fit easily */
+    font-size: 1.3em;
     word-break: break-word;
   }
   .impact-label {
-    font-size: 0.65em; /* Scaled down subtext */
+    font-size: 0.65em;
     line-height: 1.2;
   }
 
-  /* Admin forms stack neatly */
   .admin-add-row,
   .admin-rate-row {
     flex-direction: column;
@@ -1092,4 +1089,13 @@ select:focus {
   .profile-name {
     font-size: 1.25em;
   }
+}
+
+/* Export CSV hover effect */
+#exportLeaderboardBtn {
+  transition: all 0.2s ease;
+}
+#exportLeaderboardBtn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
 }

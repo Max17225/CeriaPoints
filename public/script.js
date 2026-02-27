@@ -10,6 +10,9 @@ import {
   query,
   orderBy,
   getDocs,
+  addDoc,
+  deleteDoc,
+  limit,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import {
   getAuth,
@@ -49,7 +52,8 @@ let pointRates = {
 let activeUserData = null;
 let weigherTargetUser = null;
 let cachedUsers = [];
-let isRegistering = false; // NEW: Flag to prevent auto-login flash
+let isRegistering = false;
+let pendingUndoData = null; // Stores data for the custom modal
 
 // --- TOAST & ERRORS ---
 window.showToast = function (message, type = "success") {
@@ -95,7 +99,6 @@ window.registerUser = async function () {
   if (!name || !email || !password)
     return showToast("Please fill in all registration fields.", "error");
 
-  // Tell the listener to ignore the automatic login
   isRegistering = true;
 
   try {
@@ -116,11 +119,9 @@ window.registerUser = async function () {
       profilePic: "",
     });
 
-    // Immediately sign them out before they hit the dashboard
     await signOut(auth);
     isRegistering = false;
 
-    // Clear the form fields
     document.getElementById("regName").value = "";
     document.getElementById("regEmail").value = "";
     document.getElementById("regPassword").value = "";
@@ -191,6 +192,11 @@ window.confirmLogout = function () {
     document.getElementById("navWeigher").style.display = "none";
     document.getElementById("navAdmin").style.display = "none";
     document.getElementById("navProfile").style.display = "none";
+    document.getElementById("navHistory").style.display = "none";
+
+    const exportBtn = document.getElementById("exportLeaderboardBtn");
+    if (exportBtn) exportBtn.style.display = "none";
+
     activeUserData = null;
     showToast("Logged out successfully.", "success");
   });
@@ -209,17 +215,14 @@ onAuthStateChanged(auth, async (user) => {
         await fetchAdminRates();
         loadDashboard(activeUserData);
 
-        // HIDE LOADER, USER IS LOGGED IN
         document.getElementById("initialLoader").style.display = "none";
       }
     } catch (error) {
       console.error("Error fetching user session:", error);
-      // ERROR FALLBACK
       document.getElementById("initialLoader").style.display = "none";
       document.getElementById("authContainer").style.display = "flex";
     }
   } else {
-    // HIDE LOADER, SHOW LOGIN PAGE (NOBODY IS LOGGED IN)
     document.getElementById("initialLoader").style.display = "none";
     document.getElementById("appContainer").style.display = "none";
     document.getElementById("authContainer").style.display = "flex";
@@ -256,12 +259,23 @@ function loadDashboard(userData) {
     document.getElementById("navProfile").style.display = "inline-block";
     switchRole("userPage");
   } else if (userData.role === "weigher") {
+    document.getElementById("navUser").style.display = "inline-block";
+    document.getElementById("navUser").innerText = "Leaderboard";
     document.getElementById("navWeigher").style.display = "inline-block";
+    document.getElementById("navHistory").style.display = "inline-block";
+    if (document.getElementById("exportLeaderboardBtn"))
+      document.getElementById("exportLeaderboardBtn").style.display =
+        "inline-flex";
     switchRole("weigherPage");
   } else if (userData.role === "admin") {
     document.getElementById("navUser").style.display = "inline-block";
+    document.getElementById("navUser").innerText = "Leaderboard";
     document.getElementById("navWeigher").style.display = "inline-block";
+    document.getElementById("navHistory").style.display = "inline-block"; // ALLOWS ADMIN TO SEE HISTORY
     document.getElementById("navAdmin").style.display = "inline-block";
+    if (document.getElementById("exportLeaderboardBtn"))
+      document.getElementById("exportLeaderboardBtn").style.display =
+        "inline-flex";
     switchRole("adminPage");
   }
 }
@@ -271,6 +285,7 @@ window.switchRole = function (roleId) {
   document.getElementById("weigherPage").style.display = "none";
   document.getElementById("adminPage").style.display = "none";
   document.getElementById("profilePage").style.display = "none";
+  document.getElementById("historyPage").style.display = "none";
 
   document.getElementById(roleId).style.display = "block";
 
@@ -290,10 +305,26 @@ window.switchRole = function (roleId) {
       activeUserData.points || 0;
     calculateEnvironmentalImpact(activeUserData);
     fetchLeaderboard();
+
+    // HIDE PERSONAL SECTIONS FOR WEIGHER & ADMIN
+    const personalCard = document.getElementById("personalPointsCard");
+    const personalTitle = document.getElementById("personalImpactTitle");
+    const personalGrid = document.getElementById("personalImpactGrid");
+
+    if (activeUserData.role === "weigher" || activeUserData.role === "admin") {
+      if (personalCard) personalCard.style.display = "none";
+      if (personalTitle) personalTitle.style.display = "none";
+      if (personalGrid) personalGrid.style.display = "none";
+    } else {
+      if (personalCard) personalCard.style.display = "";
+      if (personalTitle) personalTitle.style.display = "";
+      if (personalGrid) personalGrid.style.display = "";
+    }
   }
 
   if (roleId === "weigherPage") fetchUsersForSearch();
   if (roleId === "adminPage") renderAdminRates();
+  if (roleId === "historyPage") fetchTransactionHistory();
 };
 
 // --- SCALABLE ADMIN PANEL ---
@@ -420,9 +451,8 @@ window.addNewMaterial = async function () {
 window.uploadProfilePicture = function () {
   const fileInput = document.getElementById("avatarUpload");
   const file = fileInput.files[0];
-  if (!file) return; // Silent return if they close the picker without choosing
+  if (!file) return;
 
-  // Loosened check: As long as it claims to be an image, let Android try it
   if (!file.type.startsWith("image/")) {
     showToast("Please select a valid image file.", "error");
     fileInput.value = "";
@@ -445,7 +475,6 @@ window.uploadProfilePicture = function () {
       let width = img.width;
       let height = img.height;
 
-      // Smart scaling
       if (width > height) {
         if (width > MAX_WIDTH) {
           height *= MAX_WIDTH / width;
@@ -474,7 +503,6 @@ window.uploadProfilePicture = function () {
         showToast("Profile picture updated successfully!", "success");
         fileInput.value = "";
       } catch (error) {
-        // DIAGNOSTIC FIX: Show the exact raw error on your phone screen!
         showToast("DB ERROR: " + error.message, "error");
       }
     };
@@ -609,17 +637,14 @@ window.fetchLeaderboard = async function () {
     if (gCo2El) gCo2El.innerText = globalCO2.toFixed(1);
     if (gEnergyEl) gEnergyEl.innerText = globalEnergy.toFixed(1);
 
-    // Sort the users from highest score to lowest
     usersArray.sort((a, b) => b.score - a.score);
 
     let html = "";
     let rank = 1;
 
-    // Build the UI
     for (let i = 0; i < usersArray.length; i++) {
       const user = usersArray[i];
 
-      // Optional: Skip users who have 0 points for this specific view
       if (user.score <= 0) continue;
 
       const avatarSrc =
@@ -643,6 +668,78 @@ window.fetchLeaderboard = async function () {
     console.error(error);
     leaderboardList.innerHTML =
       '<p style="text-align: center; color: var(--error-color);">Failed to load leaderboard.</p>';
+  }
+};
+
+window.exportLeaderboardCSV = async function () {
+  const filterDropdown = document.getElementById("leaderboardFilter");
+  const filterMode = filterDropdown ? filterDropdown.value : "monthly";
+
+  showToast("Preparing export...", "info");
+
+  const d = new Date();
+  const currentMonthStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+
+  const dateString = `${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
+
+  try {
+    const q = query(collection(db, "users"));
+    const querySnapshot = await getDocs(q);
+
+    let exportData = [];
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.role === "user") {
+        let monthlyPts =
+          data.lastMonthUpdated === currentMonthStr
+            ? data.currentMonthPoints || 0
+            : 0;
+        let yearlyPts = data.points || 0;
+        let displayScore = filterMode === "monthly" ? monthlyPts : yearlyPts;
+
+        if (displayScore > 0) {
+          exportData.push({
+            name: data.name,
+            score: displayScore,
+          });
+        }
+      }
+    });
+
+    exportData.sort((a, b) => b.score - a.score);
+
+    let periodLabel =
+      filterMode === "monthly"
+        ? "This Month's Total Points"
+        : "This Year's Total Points";
+    let csvContent = `Report Generated On:,${dateString}\n\nRank,Student Name,${periodLabel}\n`;
+
+    let rank = 1;
+    exportData.forEach((user) => {
+      csvContent += `${rank},"${user.name}",${user.score}\n`;
+      rank++;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `CeriaPoints_${filterMode}_Leaderboard_${dateString}.csv`,
+    );
+    link.style.display = "none";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("Download started!", "success");
+  } catch (error) {
+    console.error("Export Error: ", error);
+    showToast("Failed to generate export file.", "error");
   }
 };
 
@@ -775,15 +872,22 @@ window.processWeighIn = async function () {
   if (isNaN(weight) || weight <= 0)
     return showToast("Error: Weight must be a positive number.", "error");
 
-  weight = parseFloat(weight.toFixed(3));
-
-  const rateConfig = pointRates[material] || { rate: 0 };
-  const pointsEarned = Math.floor(weight * rateConfig.rate);
-
-  const date = new Date();
-  const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
+  const submitBtn = document.querySelector(
+    "#weighingForm button[type='submit']",
+  );
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Saving...";
+  }
 
   try {
+    weight = parseFloat(weight.toFixed(3));
+    const rateConfig = pointRates[material] || { rate: 0 };
+    const pointsEarned = Math.floor(weight * rateConfig.rate);
+
+    const date = new Date();
+    const currentMonthStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
+
     const userRef = doc(db, "users", weigherTargetUser.uid);
     const freshUserDoc = await getDoc(userRef);
     const freshData = freshUserDoc.data();
@@ -810,18 +914,187 @@ window.processWeighIn = async function () {
       [dbField]: newMaterialWeight,
     });
 
+    await addDoc(collection(db, "transactions"), {
+      studentId: weigherTargetUser.uid,
+      studentName: weigherTargetUser.name,
+      weigherName: activeUserData.name,
+      material: material,
+      weightKg: weight,
+      pointsAwarded: pointsEarned,
+      timestamp: new Date().toLocaleString(),
+    });
+
     showToast(`Success! Awarded ${pointsEarned} pts.`, "success");
 
-    // 1. ONLY clear the weight input so they can instantly enter the next item
     document.getElementById("weightInput").value = "";
-
-    // 2. Update the student's local point counter so the Weigher sees the points go up live!
     weigherTargetUser.points = newTotalPoints;
     document.getElementById("liveUserPoints").innerText = newTotalPoints;
 
-    // 3. Keep the form open, do NOT set weigherTargetUser to null yet.
     fetchUsersForSearch();
   } catch (error) {
     showToast("Error saving data. Please try again.", "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Award Points Now";
+    }
+  }
+};
+
+// --- HISTORY & UNDO SYSTEM ---
+window.fetchTransactionHistory = async function () {
+  const list = document.getElementById("transactionList");
+  list.innerHTML = '<p style="color: var(--text-muted)">Loading...</p>';
+
+  try {
+    const q = query(
+      collection(db, "transactions"),
+      orderBy("timestamp", "desc"),
+      limit(50),
+    );
+    const snap = await getDocs(q);
+
+    let html = "";
+    snap.forEach((doc) => {
+      const data = doc.data();
+      html += `
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong style="color: var(--primary-color)">${data.studentName}</strong>
+            <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
+              ${data.weightKg}kg ${data.material} • <strong style="color: var(--accent-hover); font-size: 1.1em;">+${data.pointsAwarded} pts</strong> <br>
+              <small>By ${data.weigherName} on ${data.timestamp}</small>
+            </div>
+          </div>
+          <button class="action-btn small-btn" style="background-color: var(--error-color); color: white; width: auto; margin: 0; padding: 6px 16px; box-shadow: 0 2px 4px rgba(231,76,60,0.3);"
+            onclick="promptUndoTransaction('${doc.id}', '${data.studentId}', '${data.material}', ${data.weightKg}, ${data.pointsAwarded})">
+            Undo
+          </button>
+        </div>
+      `;
+    });
+
+    list.innerHTML = html || "<p>No recent point transactions found.</p>";
+  } catch (error) {
+    console.error(error);
+    list.innerHTML =
+      '<p style="color: red">Failed to load history. Ensure Firebase indexes are built if needed.</p>';
+  }
+};
+
+window.promptUndoTransaction = function (
+  docId,
+  studentId,
+  material,
+  weight,
+  pointsToSubtract,
+) {
+  pendingUndoData = { docId, studentId, material, weight, pointsToSubtract };
+  document.getElementById("undoModal").style.display = "flex";
+};
+
+window.closeUndoModal = function () {
+  pendingUndoData = null;
+  document.getElementById("undoModal").style.display = "none";
+};
+
+window.confirmUndoTransaction = async function () {
+  if (!pendingUndoData) return;
+  const { docId, studentId, material, weight, pointsToSubtract } =
+    pendingUndoData;
+
+  document.getElementById("undoModal").style.display = "none";
+  showToast("Reversing transaction...", "info");
+
+  try {
+    const userRef = doc(db, "users", studentId);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const freshData = userDoc.data();
+
+      const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
+      const dbField =
+        "total" + safeMaterial.charAt(0).toUpperCase() + safeMaterial.slice(1);
+
+      const newTotalPoints = Math.max(
+        0,
+        (freshData.points || 0) - pointsToSubtract,
+      );
+      const newMonthlyPoints = Math.max(
+        0,
+        (freshData.currentMonthPoints || 0) - pointsToSubtract,
+      );
+      const newWeight = Math.max(0, (freshData[dbField] || 0) - weight);
+
+      await updateDoc(userRef, {
+        points: newTotalPoints,
+        currentMonthPoints: newMonthlyPoints,
+        [dbField]: newWeight,
+      });
+    }
+
+    await deleteDoc(doc(db, "transactions", docId));
+
+    showToast("Transaction undone successfully.", "success");
+    fetchTransactionHistory();
+  } catch (error) {
+    console.error(error);
+    showToast("Error undoing transaction.", "error");
+  } finally {
+    pendingUndoData = null; // Clear the pending data safely
+  }
+};
+
+// --- ANNUAL SEASON RESET ---
+window.triggerAnnualReset = async function () {
+  if (
+    !confirm(
+      "⚠️ WARNING: This will permanently archive all current user points and reset everyone's balance and material weights to 0. Are you absolutely sure?",
+    )
+  ) {
+    return;
+  }
+
+  showToast("Starting annual reset... Please wait.", "info");
+
+  try {
+    const q = query(collection(db, "users"));
+    const querySnapshot = await getDocs(q);
+    const currentYear = new Date().getFullYear();
+
+    for (const userDoc of querySnapshot.docs) {
+      const data = userDoc.data();
+
+      if (data.role === "user") {
+        const userRef = doc(db, "users", userDoc.id);
+
+        let updates = {
+          points: 0,
+          currentMonthPoints: 0,
+          [`archive_${currentYear}`]: data.points || 0,
+        };
+
+        for (const material of Object.keys(pointRates)) {
+          const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
+          const dbField =
+            "total" +
+            safeMaterial.charAt(0).toUpperCase() +
+            safeMaterial.slice(1);
+          updates[dbField] = 0;
+        }
+
+        await updateDoc(userRef, updates);
+      }
+    }
+
+    showToast(
+      `Success! The ${currentYear} season has been completely reset.`,
+      "success",
+    );
+    fetchLeaderboard();
+  } catch (error) {
+    console.error(error);
+    showToast("Error during reset. Check console.", "error");
   }
 };
