@@ -680,7 +680,6 @@ window.exportLeaderboardCSV = async function () {
 
   const d = new Date();
   const currentMonthStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
-
   const dateString = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 
   try {
@@ -693,6 +692,8 @@ window.exportLeaderboardCSV = async function () {
     let globalCO2 = 0;
     let globalEnergy = 0;
 
+    const activeMaterials = Object.keys(pointRates);
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data.role === "user") {
@@ -702,13 +703,7 @@ window.exportLeaderboardCSV = async function () {
             : 0;
         let yearlyPts = data.points || 0;
         let displayScore = filterMode === "monthly" ? monthlyPts : yearlyPts;
-
-        if (displayScore > 0) {
-          exportData.push({
-            name: data.name,
-            score: displayScore,
-          });
-        }
+        let userWeights = {};
 
         for (const [material, config] of Object.entries(pointRates)) {
           const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
@@ -718,12 +713,24 @@ window.exportLeaderboardCSV = async function () {
             safeMaterial.slice(1);
           const userWeight = data[dbField] || 0;
 
+          // Save the weight for this user
+          userWeights[material] = userWeight;
+
+          // Add to global totals
           if (config.impactType === "trees")
             globalTrees += userWeight * config.multiplier;
           if (config.impactType === "co2")
             globalCO2 += userWeight * config.multiplier;
           if (config.impactType === "energy")
             globalEnergy += userWeight * config.multiplier;
+        }
+
+        if (displayScore > 0) {
+          exportData.push({
+            name: data.name,
+            score: displayScore,
+            weights: userWeights, 
+          });
         }
       }
     });
@@ -739,11 +746,20 @@ window.exportLeaderboardCSV = async function () {
     csvContent += `Total Trees Saved:,${globalTrees.toFixed(1)}\n`;
     csvContent += `Total CO2 Prevented (kg):,${globalCO2.toFixed(1)}\n`;
     csvContent += `Total Energy Saved (kWh):,${globalEnergy.toFixed(1)}\n\n`;
-    csvContent += `Rank,Student Name,${periodLabel}\n`;
+
+    let materialHeaders = activeMaterials
+      .map((m) => `Total ${m.charAt(0).toUpperCase() + m.slice(1)} (kg)`)
+      .join(",");
+
+    csvContent += `Rank,Student Name,${periodLabel},${materialHeaders}\n`;
 
     let rank = 1;
     exportData.forEach((user) => {
-      csvContent += `${rank},"${user.name}",${user.score}\n`;
+      let materialValues = activeMaterials
+        .map((m) => (user.weights[m] || 0).toFixed(3))
+        .join(",");
+
+      csvContent += `${rank},"${user.name}",${user.score},${materialValues}\n`;
       rank++;
     });
 
