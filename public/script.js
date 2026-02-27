@@ -671,6 +671,7 @@ window.fetchLeaderboard = async function () {
   }
 };
 
+// --- EXPORT LEADERBOARD TO CSV ---
 window.exportLeaderboardCSV = async function () {
   const filterDropdown = document.getElementById("leaderboardFilter");
   const filterMode = filterDropdown ? filterDropdown.value : "monthly";
@@ -680,13 +681,17 @@ window.exportLeaderboardCSV = async function () {
   const d = new Date();
   const currentMonthStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
 
-  const dateString = `${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
+  const dateString = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
 
   try {
     const q = query(collection(db, "users"));
     const querySnapshot = await getDocs(q);
 
     let exportData = [];
+
+    let globalTrees = 0;
+    let globalCO2 = 0;
+    let globalEnergy = 0;
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -704,16 +709,35 @@ window.exportLeaderboardCSV = async function () {
             score: displayScore,
           });
         }
+
+        for (const [material, config] of Object.entries(pointRates)) {
+          const safeMaterial = material.replace(/[^a-zA-Z0-9]/g, "");
+          const dbField =
+            "total" +
+            safeMaterial.charAt(0).toUpperCase() +
+            safeMaterial.slice(1);
+          const userWeight = data[dbField] || 0;
+
+          if (config.impactType === "trees")
+            globalTrees += userWeight * config.multiplier;
+          if (config.impactType === "co2")
+            globalCO2 += userWeight * config.multiplier;
+          if (config.impactType === "energy")
+            globalEnergy += userWeight * config.multiplier;
+        }
       }
     });
 
     exportData.sort((a, b) => b.score - a.score);
 
     let periodLabel =
-      filterMode === "monthly"
-        ? "This Month's Total Points"
-        : "This Year's Total Points";
-    let csvContent = `Report Generated On:,${dateString}\n\nRank,Student Name,${periodLabel}\n`;
+      filterMode === "monthly" ? "Monthly Points" : "All-Time Points";
+
+    let csvContent = `Report Generated On:,${dateString}\n`;
+    csvContent += `Total Trees Saved:,${globalTrees.toFixed(1)}\n`;
+    csvContent += `Total CO2 Prevented (kg):,${globalCO2.toFixed(1)}\n`;
+    csvContent += `Total Energy Saved (kWh):,${globalEnergy.toFixed(1)}\n\n`;
+    csvContent += `Rank,Student Name,${periodLabel}\n`;
 
     let rank = 1;
     exportData.forEach((user) => {
@@ -725,10 +749,11 @@ window.exportLeaderboardCSV = async function () {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
+    const safeDateForFile = `${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `CeriaPoints_${filterMode}_Leaderboard_${dateString}.csv`,
+      `CeriaPoints_${filterMode}_Leaderboard_${safeDateForFile}.csv`,
     );
     link.style.display = "none";
 
