@@ -2,7 +2,7 @@
 
 CeriaPoints is a sustainable, community-focused web application designed specifically for the Tadika Matahari Ceria kindergarten. This project aims to encourage students and parents to recycle by turning waste management into a fun, gamified experience.
 
-**🌐 Live Web App Available on:** [https://ceriapoints.vercel.app/](https://ceriapoints.tmceria.fun/)
+**🌐 Live Web App Available on:** [(https://ceriapoints.tmceria.fun/)](https://ceriapoints.tmceria.fun/)
 
 ## 🚀 Project Motivation
 
