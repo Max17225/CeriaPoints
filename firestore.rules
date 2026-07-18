@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isWeigher() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'weigher';
+    }
+    function isStaff() {
+      return isAdmin() || isWeigher();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read, write: if isStaff();
+    }
+
+    match /settings/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Meter readings — required for the Meters tab
+    match /meterReadings/{readingId} {
+      allow read: if isAuthenticated();
+
+      // Own readings, or admin managing anyone
+      allow create: if isAuthenticated()
+        && (request.resource.data.userId == request.auth.uid || isAdmin());
+
+      allow update: if isAuthenticated()
+        && (
+          (resource.data.userId == request.auth.uid
+            && request.resource.data.userId == request.auth.uid)
+          || isAdmin()
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

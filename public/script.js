@@ -13,6 +13,7 @@ import {
   addDoc,
   deleteDoc,
   limit,
+  where,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import {
   getAuth,
@@ -54,6 +55,15 @@ let weigherTargetUser = null;
 let cachedUsers = [];
 let isRegistering = false;
 let pendingUndoData = null; // Stores data for the custom modal
+let meterUsageChart = null;
+let myMeterChart = null;
+let meterFsChart = null;
+let meterFsSource = null;
+let myMeterHistoryType = "electricity";
+let adminMeterTargetUser = null;
+let pendingMeterDeleteId = null;
+let adminMeterUserMatches = [];
+let meterCachedUsers = []; // separate from weigher cachedUsers (which omits role)
 
 // --- TOAST & ERRORS ---
 window.showToast = function (message, type = "success") {
@@ -193,9 +203,28 @@ window.confirmLogout = function () {
     document.getElementById("navAdmin").style.display = "none";
     document.getElementById("navProfile").style.display = "none";
     document.getElementById("navHistory").style.display = "none";
+    document.getElementById("navMeters").style.display = "none";
 
     const exportBtn = document.getElementById("exportLeaderboardBtn");
     if (exportBtn) exportBtn.style.display = "none";
+
+    if (meterUsageChart) {
+      meterUsageChart.destroy();
+      meterUsageChart = null;
+    }
+    if (myMeterChart) {
+      myMeterChart.destroy();
+      myMeterChart = null;
+    }
+    if (meterFsChart) {
+      meterFsChart.destroy();
+      meterFsChart = null;
+    }
+    meterFsSource = null;
+
+    meterCachedUsers = [];
+    adminMeterUserMatches = [];
+    adminMeterTargetUser = null;
 
     activeUserData = null;
     showToast("Logged out successfully.", "success");
@@ -256,12 +285,14 @@ function loadDashboard(userData) {
 
   if (userData.role === "user") {
     document.getElementById("navUser").style.display = "inline-block";
+    document.getElementById("navMeters").style.display = "inline-block";
     document.getElementById("navProfile").style.display = "inline-block";
     switchRole("userPage");
   } else if (userData.role === "weigher") {
     document.getElementById("navUser").style.display = "inline-block";
     document.getElementById("navUser").innerText = "Leaderboard";
     document.getElementById("navWeigher").style.display = "inline-block";
+    document.getElementById("navMeters").style.display = "inline-block";
     document.getElementById("navHistory").style.display = "inline-block";
     if (document.getElementById("exportLeaderboardBtn"))
       document.getElementById("exportLeaderboardBtn").style.display =
@@ -271,6 +302,7 @@ function loadDashboard(userData) {
     document.getElementById("navUser").style.display = "inline-block";
     document.getElementById("navUser").innerText = "Leaderboard";
     document.getElementById("navWeigher").style.display = "inline-block";
+    document.getElementById("navMeters").style.display = "inline-block";
     document.getElementById("navHistory").style.display = "inline-block"; // ALLOWS ADMIN TO SEE HISTORY
     document.getElementById("navAdmin").style.display = "inline-block";
     if (document.getElementById("exportLeaderboardBtn"))
@@ -286,6 +318,7 @@ window.switchRole = function (roleId) {
   document.getElementById("adminPage").style.display = "none";
   document.getElementById("profilePage").style.display = "none";
   document.getElementById("historyPage").style.display = "none";
+  document.getElementById("metersPage").style.display = "none";
 
   document.getElementById(roleId).style.display = "block";
 
@@ -325,6 +358,7 @@ window.switchRole = function (roleId) {
   if (roleId === "weigherPage") fetchUsersForSearch();
   if (roleId === "adminPage") renderAdminRates();
   if (roleId === "historyPage") fetchTransactionHistory();
+  if (roleId === "metersPage") loadMetersPage();
 };
 
 // --- SCALABLE ADMIN PANEL ---
@@ -1139,5 +1173,1110 @@ window.triggerAnnualReset = async function () {
   } catch (error) {
     console.error(error);
     showToast("Error during reset. Check console.", "error");
+  }
+};
+
+// --- METER READINGS ---
+const METER_UNITS = { electricity: "kWh", water: "m³" };
+const METER_LABELS = { electricity: "Electricity", water: "Water" };
+/** Activity-feed style page size (common default: 25–50). */
+const METER_HISTORY_LIMIT = 30;
+
+function getLocalDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function daysBetween(dateA, dateB) {
+  const a = new Date(dateA + "T00:00:00");
+  const b = new Date(dateB + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+function meterDocId(userId, type, date) {
+  return `${userId}_${type}_${date}`;
+}
+
+function formatMeterNumber(n) {
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
+/** First chronological reading is a baseline (no usage yet). */
+function isBaselineReading(readingsSortedAsc, reading) {
+  if (!reading) return false;
+  if (reading.isBaseline === true) return true;
+  if (!readingsSortedAsc.length) return false;
+  return readingsSortedAsc[0].date === reading.date;
+}
+
+function usageReadingsOnly(readingsSortedAsc) {
+  return readingsSortedAsc.filter((r) => !isBaselineReading(readingsSortedAsc, r));
+}
+
+async function fetchMeterReadingsForUser(userId, type = null, options = {}) {
+  const { limitCount = null } = options;
+
+  // Prefer server-side limit for history lists (needs composite index: userId+type+date)
+  if (limitCount && type) {
+    try {
+      const q = query(
+        collection(db, "meterReadings"),
+        where("userId", "==", userId),
+        where("type", "==", type),
+        orderBy("date", "desc"),
+        limit(limitCount),
+      );
+      const snap = await getDocs(q);
+      // Return oldest→newest for shared helpers
+      return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    } catch (err) {
+      console.warn(
+        "Limited meter query failed (index may be building). Falling back.",
+        err,
+      );
+    }
+  }
+
+  const q = query(collection(db, "meterReadings"), where("userId", "==", userId));
+  const snap = await getDocs(q);
+  let rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  if (type) rows = rows.filter((r) => r.type === type);
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  if (limitCount && rows.length > limitCount) {
+    rows = rows.slice(-limitCount);
+  }
+  return rows;
+}
+
+async function fetchMeterReadingsByType(type, options = {}) {
+  const { startDate = null, endDate = null } = options;
+  const q = query(collection(db, "meterReadings"), where("type", "==", type));
+  const snap = await getDocs(q);
+  let rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  if (startDate) rows = rows.filter((r) => r.date >= startDate);
+  if (endDate) rows = rows.filter((r) => r.date <= endDate);
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function findPreviousReading(readings, beforeDate) {
+  let prev = null;
+  for (const r of readings) {
+    if (r.date < beforeDate) prev = r;
+    else break;
+  }
+  return prev;
+}
+
+function findNextReading(readings, afterDate) {
+  return readings.find((r) => r.date > afterDate) || null;
+}
+
+function getDateRangeFromTo(fromDate, toDate) {
+  if (!fromDate || !toDate) return null;
+  if (fromDate > toDate) return null;
+
+  const labels = [];
+  const cursor = new Date(fromDate + "T00:00:00");
+  const end = new Date(toDate + "T00:00:00");
+  // Cap very large ranges so the chart stays usable
+  const maxDays = 366;
+  let count = 0;
+  while (cursor <= end && count < maxDays) {
+    labels.push(getLocalDateString(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    count++;
+  }
+  return {
+    startDate: fromDate,
+    endDate: toDate,
+    labels,
+    truncated: cursor <= end,
+  };
+}
+
+function defaultMeterRangeDates() {
+  const today = getLocalDateString();
+  return { from: today, to: today };
+}
+
+function initMeterDateInputs() {
+  const defaults = defaultMeterRangeDates();
+  const pairs = [
+    ["myMeterFromDate", "myMeterToDate"],
+    ["meterFromDate", "meterToDate"],
+  ];
+  for (const [fromId, toId] of pairs) {
+    const fromEl = document.getElementById(fromId);
+    const toEl = document.getElementById(toId);
+    if (!fromEl || !toEl) continue;
+    if (!fromEl.value) fromEl.value = defaults.from;
+    if (!toEl.value) toEl.value = defaults.to;
+    toEl.max = defaults.to;
+  }
+}
+
+function readMeterDateRange(fromId, toId) {
+  const fromEl = document.getElementById(fromId);
+  const toEl = document.getElementById(toId);
+  const fromDate = fromEl?.value;
+  const toDate = toEl?.value;
+  if (!fromDate || !toDate) {
+    showToast("Please pick both From and To dates.", "error");
+    return null;
+  }
+  if (fromDate > toDate) {
+    showToast("From date must be on or before To date.", "error");
+    return null;
+  }
+  const range = getDateRangeFromTo(fromDate, toDate);
+  if (range?.truncated) {
+    showToast("Range is limited to 366 days. Showing the first year.", "error");
+  }
+  return range;
+}
+
+function meterChartColor(index) {
+  const palette = [
+    "#3c78d8",
+    "#27ae60",
+    "#e67e22",
+    "#8e44ad",
+    "#e74c3c",
+    "#16a085",
+    "#2980b9",
+    "#c0392b",
+    "#d35400",
+    "#2c3e50",
+  ];
+  return palette[index % palette.length];
+}
+
+/** Larger hit areas for finger taps on phones / tablets / iPads. */
+function isCompactMeterViewport() {
+  return window.matchMedia("(max-width: 1024px)").matches;
+}
+
+function meterTouchPointStyle(dayCount) {
+  const touch = isCompactMeterViewport();
+  if (touch) {
+    return {
+      pointRadius: dayCount <= 14 ? 8 : 6,
+      pointHoverRadius: 10,
+      pointHitRadius: 24,
+      borderWidth: 3,
+    };
+  }
+  return {
+    pointRadius: dayCount <= 14 ? 5 : 3,
+    pointHoverRadius: 7,
+    pointHitRadius: 12,
+    borderWidth: 2.5,
+  };
+}
+
+function applyMeterChartTouchLayout(canvas, dayCount = 7) {
+  const wrap = canvas?.parentElement;
+  if (!wrap) return;
+  const touch = isCompactMeterViewport();
+  const isFullscreen = canvas.id === "meterFsCanvas";
+
+  if (isFullscreen) {
+    wrap.style.minWidth = "100%";
+    wrap.style.minHeight = "";
+  } else {
+    // Give each day enough horizontal room so labels/points aren't crushed
+    const pxPerDay = touch ? 44 : 36;
+    const minWidth = Math.max(
+      wrap.parentElement?.clientWidth || 280,
+      dayCount * pxPerDay,
+    );
+    wrap.style.minWidth = `${minWidth}px`;
+    wrap.style.minHeight = touch ? "260px" : "280px";
+  }
+
+  canvas.style.touchAction = isFullscreen ? "manipulation" : "pan-x manipulation";
+  canvas.style.cursor = "pointer";
+}
+
+window.openMeterChartFullscreen = async function (source) {
+  const overlay = document.getElementById("meterChartFullscreen");
+  const title = document.getElementById("meterFsTitle");
+  if (!overlay || !title) return;
+
+  const hasData =
+    source === "community" ? !!meterUsageChart : !!myMeterChart;
+  if (!hasData) {
+    showToast("Load a chart first (pick dates and press Show).", "error");
+    return;
+  }
+
+  meterFsSource = source;
+  title.innerText = source === "community" ? "Community Usage" : "My Usage";
+  overlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+
+  if (source === "community") {
+    await renderMeterChart({ canvasId: "meterFsCanvas" });
+  } else {
+    await renderMyMeterChart({ canvasId: "meterFsCanvas" });
+  }
+};
+
+window.closeMeterChartFullscreen = function () {
+  const overlay = document.getElementById("meterChartFullscreen");
+  if (overlay) overlay.style.display = "none";
+  document.body.style.overflow = "";
+  if (meterFsChart) {
+    meterFsChart.destroy();
+    meterFsChart = null;
+  }
+  meterFsSource = null;
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMeterChartFullscreen();
+});
+
+window.loadMetersPage = async function () {
+  const today = getLocalDateString();
+  document.getElementById("meterTodayLabel").innerText = `Today · ${today}`;
+
+  const adminSection = document.getElementById("adminMetersSection");
+  if (adminSection) {
+    adminSection.style.display =
+      activeUserData.role === "admin" ? "block" : "none";
+  }
+
+  initMeterDateInputs();
+  await refreshMeterSubmitPanel();
+  await renderMyMeterChart();
+  await showMyMeterHistory(myMeterHistoryType);
+  await renderMeterChart();
+
+  if (activeUserData.role === "admin") {
+    await ensureCachedUsersForMeters();
+  }
+};
+
+async function refreshMeterSubmitPanel() {
+  const today = getLocalDateString();
+  for (const type of ["electricity", "water"]) {
+    const readings = await fetchMeterReadingsForUser(activeUserData.uid, type);
+    const todayRow = readings.find((r) => r.date === today);
+    const prev = findPreviousReading(readings, today);
+    const unit = METER_UNITS[type];
+    const prevEl = document.getElementById(`${type}PrevInfo`);
+    const gapEl = document.getElementById(`${type}GapNotice`);
+    const inputEl = document.getElementById(`${type}ReadingInput`);
+
+    if (todayRow) {
+      const todayIsBaseline = isBaselineReading(readings, todayRow);
+      if (todayIsBaseline) {
+        prevEl.innerHTML = `Today's baseline reading: <strong>${formatMeterNumber(todayRow.reading)} ${unit}</strong> — usage starts from your next reading.`;
+      } else {
+        prevEl.innerHTML = `Today's saved reading: <strong>${formatMeterNumber(todayRow.reading)} ${unit}</strong> (usage ${formatMeterNumber(todayRow.usage)} ${unit})`;
+      }
+      inputEl.value = todayRow.reading;
+      if (prev) {
+        const gap = daysBetween(prev.date, today);
+        if (gap > 1) {
+          gapEl.style.display = "block";
+          gapEl.innerText = `Last reading before today was ${prev.date} (${gap} days ago). Today's usage covers that period.`;
+        } else {
+          gapEl.style.display = "none";
+        }
+      } else {
+        gapEl.style.display = "none";
+      }
+    } else if (prev) {
+      prevEl.innerHTML = `Previous reading: <strong>${formatMeterNumber(prev.reading)} ${unit}</strong> on ${prev.date}`;
+      inputEl.value = "";
+      const gap = daysBetween(prev.date, today);
+      if (gap > 1) {
+        gapEl.style.display = "block";
+        gapEl.innerText = `Last reading was ${gap} days ago (${prev.date}). Today's usage will cover that whole period.`;
+      } else {
+        gapEl.style.display = "none";
+      }
+    } else {
+      prevEl.innerText = "No previous reading yet — first entry sets your baseline.";
+      inputEl.value = "";
+      gapEl.style.display = "none";
+    }
+  }
+}
+
+async function saveMeterReadingRecord({
+  userId,
+  userName,
+  type,
+  date,
+  reading,
+}) {
+  const readings = await fetchMeterReadingsForUser(userId, type);
+  const prev = findPreviousReading(readings, date);
+  const existing = readings.find((r) => r.date === date);
+
+  if (prev && reading < prev.reading) {
+    throw new Error(
+      `Reading must be at least ${formatMeterNumber(prev.reading)} ${METER_UNITS[type]} (previous on ${prev.date}).`,
+    );
+  }
+
+  const usage = prev ? Number((reading - prev.reading).toFixed(3)) : 0;
+  const gapDays = prev ? daysBetween(prev.date, date) : 0;
+  const isBaseline = !prev;
+  const nowIso = new Date().toISOString();
+  const docId = meterDocId(userId, type, date);
+
+  await setDoc(doc(db, "meterReadings", docId), {
+    userId,
+    userName,
+    type,
+    date,
+    reading,
+    usage,
+    gapDays,
+    isBaseline,
+    unit: METER_UNITS[type],
+    submittedAt: existing?.submittedAt || nowIso,
+    updatedAt: nowIso,
+  });
+
+  // Recalculate the next reading after this date (if any)
+  const refreshed = await fetchMeterReadingsForUser(userId, type);
+  const next = findNextReading(refreshed, date);
+  if (next) {
+    const nextPrev = findPreviousReading(refreshed, next.date);
+    const nextUsage = nextPrev
+      ? Number((next.reading - nextPrev.reading).toFixed(3))
+      : 0;
+    if (nextPrev && next.reading < nextPrev.reading) {
+      throw new Error(
+        `Cannot save: would make the later reading on ${next.date} lower than this one.`,
+      );
+    }
+    await updateDoc(doc(db, "meterReadings", next.id), {
+      usage: nextUsage,
+      gapDays: nextPrev ? daysBetween(nextPrev.date, next.date) : 0,
+      isBaseline: !nextPrev,
+      updatedAt: nowIso,
+    });
+  }
+
+  return { usage, gapDays, isBaseline };
+}
+
+window.submitMeterReading = async function (type) {
+  if (!activeUserData) return;
+  const input = document.getElementById(`${type}ReadingInput`);
+  const raw = input.value;
+  if (raw === "" || raw === null)
+    return showToast("Please enter today's meter reading.", "error");
+
+  const reading = Number(raw);
+  if (Number.isNaN(reading) || reading < 0)
+    return showToast("Please enter a valid non-negative number.", "error");
+
+  const date = getLocalDateString();
+  try {
+    const result = await saveMeterReadingRecord({
+      userId: activeUserData.uid,
+      userName: activeUserData.name,
+      type,
+      date,
+      reading,
+    });
+
+    if (result.isBaseline) {
+      showToast(
+        `${METER_LABELS[type]} baseline saved. Usage starts from your next reading.`,
+        "success",
+      );
+    } else if (result.gapDays > 1) {
+      showToast(
+        `Saved. Usage: ${formatMeterNumber(result.usage)} ${METER_UNITS[type]} (covers ${result.gapDays} days).`,
+        "success",
+      );
+    } else {
+      showToast(
+        `Saved. Usage: ${formatMeterNumber(result.usage)} ${METER_UNITS[type]}.`,
+        "success",
+      );
+    }
+
+    await refreshMeterSubmitPanel();
+    await renderMyMeterChart();
+    await showMyMeterHistory(myMeterHistoryType);
+    await renderMeterChart();
+  } catch (error) {
+    console.error(error);
+    const msg =
+      error.code === "permission-denied" ||
+      (error.message || "").includes("insufficient permissions")
+        ? "Permission denied. Publish the meterReadings Firestore rules, then try again."
+        : error.message || "Failed to save reading.";
+    showToast(msg, "error");
+  }
+};
+
+window.focusMeterHistoryDate = function (dateStr) {
+  if (!dateStr) return;
+  const row = document.getElementById(`meter-hist-${dateStr}`);
+  if (!row) {
+    showToast(`No history row for ${dateStr}.`, "info");
+    return;
+  }
+  document
+    .querySelectorAll(".meter-history-row.meter-history-highlight")
+    .forEach((el) => el.classList.remove("meter-history-highlight"));
+  row.classList.add("meter-history-highlight");
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+window.renderMyMeterChart = async function (options = {}) {
+  const canvasId = options.canvasId || "myMeterUsageChart";
+  const isFullscreen = canvasId === "meterFsCanvas";
+  const typeEl = document.getElementById("myMeterChartType");
+  const emptyEl = document.getElementById("myMeterChartEmpty");
+  const canvas = document.getElementById(canvasId);
+  if (!typeEl || !canvas || !activeUserData) return;
+
+  initMeterDateInputs();
+  const range = readMeterDateRange("myMeterFromDate", "myMeterToDate");
+  if (!range) return;
+
+  const type = typeEl.value;
+  const unit = METER_UNITS[type];
+  const fullDayLabels = range.labels;
+  const dayCount = fullDayLabels.length;
+
+  const destroyChart = () => {
+    if (isFullscreen) {
+      if (meterFsChart) {
+        meterFsChart.destroy();
+        meterFsChart = null;
+      }
+    } else if (myMeterChart) {
+      myMeterChart.destroy();
+      myMeterChart = null;
+    }
+  };
+
+  try {
+    const readings = await fetchMeterReadingsForUser(activeUserData.uid, type);
+    const plotReadings = usageReadingsOnly(readings);
+
+    if (!readings.length) {
+      destroyChart();
+      if (!isFullscreen && emptyEl) {
+        canvas.style.display = "none";
+        emptyEl.style.display = "block";
+        emptyEl.innerText = "No personal readings yet. Submit your first reading above.";
+      }
+      return;
+    }
+
+    if (!plotReadings.length) {
+      destroyChart();
+      if (!isFullscreen && emptyEl) {
+        canvas.style.display = "none";
+        emptyEl.style.display = "block";
+        emptyEl.innerText =
+          "Baseline saved. Submit again on a later day to see usage on this chart.";
+      }
+      return;
+    }
+
+    const byDate = {};
+    for (const r of plotReadings) {
+      if (r.date >= range.startDate && r.date <= range.endDate) {
+        byDate[r.date] = Number(r.usage) || 0;
+      }
+    }
+
+    const hasPoints = Object.keys(byDate).length > 0;
+    if (!hasPoints) {
+      destroyChart();
+      if (!isFullscreen && emptyEl) {
+        canvas.style.display = "none";
+        emptyEl.style.display = "block";
+        emptyEl.innerText = "No usage in this date range. Try a wider From / To.";
+      }
+      return;
+    }
+
+    const labels = fullDayLabels.map((d) => d.slice(5));
+    const values = fullDayLabels.map((d) =>
+      Object.prototype.hasOwnProperty.call(byDate, d) ? byDate[d] : null,
+    );
+
+    canvas.style.display = "block";
+    if (!isFullscreen && emptyEl) emptyEl.style.display = "none";
+    applyMeterChartTouchLayout(canvas, dayCount);
+
+    destroyChart();
+
+    const pointStyle = meterTouchPointStyle(dayCount);
+    const touchHint = isCompactMeterViewport()
+      ? "Tap point → open in My History"
+      : "Click point → jump to My History";
+
+    const chart = new window.Chart(canvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: `My usage (${unit})`,
+            data: values,
+            borderColor: "#3c78d8",
+            backgroundColor: "rgba(60, 120, 216, 0.12)",
+            borderWidth: pointStyle.borderWidth,
+            tension: 0,
+            spanGaps: true,
+            fill: true,
+            pointRadius: pointStyle.pointRadius,
+            pointHoverRadius: pointStyle.pointHoverRadius,
+            pointHitRadius: pointStyle.pointHitRadius,
+            pointBackgroundColor: "#3c78d8",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        events: [
+          "mousemove",
+          "mouseout",
+          "click",
+          "touchstart",
+          "touchmove",
+          "touchend",
+        ],
+        onClick(_evt, elements) {
+          if (!elements.length || !fullDayLabels) return;
+          const dateStr = fullDayLabels[elements[0].index];
+          if (dateStr) {
+            if (isFullscreen) closeMeterChartFullscreen();
+            focusMeterHistoryDate(dateStr);
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { size: isCompactMeterViewport() ? 14 : 12 },
+            bodyFont: { size: isCompactMeterViewport() ? 14 : 12 },
+            padding: isCompactMeterViewport() ? 12 : 8,
+            callbacks: {
+              title(items) {
+                if (!items.length) return "";
+                return fullDayLabels[items[0].dataIndex] || items[0].label;
+              },
+              label(ctx) {
+                if (ctx.parsed.y === null) return null;
+                return `${formatMeterNumber(ctx.parsed.y)} ${unit}`;
+              },
+              afterBody() {
+                return [touchHint];
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "Date" },
+            ticks: {
+              maxRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: dayCount <= 14 ? dayCount : Math.min(dayCount, 16),
+              font: { size: isCompactMeterViewport() ? 11 : 12 },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: `Usage (${unit})` },
+          },
+        },
+      },
+    });
+
+    if (isFullscreen) meterFsChart = chart;
+    else myMeterChart = chart;
+  } catch (error) {
+    console.error(error);
+    if (!isFullscreen && emptyEl) {
+      emptyEl.style.display = "block";
+      emptyEl.innerText = "Failed to load your usage chart.";
+      canvas.style.display = "none";
+    }
+  }
+};
+
+window.showMyMeterHistory = async function (type) {
+  myMeterHistoryType = type;
+  document
+    .querySelectorAll(".meter-hist-tab")
+    .forEach((btn) => btn.classList.remove("active"));
+  const tab = document.getElementById(
+    type === "electricity" ? "meterHistTabElectricity" : "meterHistTabWater",
+  );
+  if (tab) tab.classList.add("active");
+
+  const list = document.getElementById("myMeterHistoryList");
+  list.innerHTML = '<p style="color: var(--text-muted)">Loading...</p>';
+
+  try {
+    const readings = await fetchMeterReadingsForUser(activeUserData.uid, type, {
+      limitCount: METER_HISTORY_LIMIT,
+    });
+    const unit = METER_UNITS[type];
+    if (!readings.length) {
+      list.innerHTML = `<p style="color: var(--text-muted)">No ${METER_LABELS[type].toLowerCase()} readings yet.</p>`;
+      return;
+    }
+
+    const rows = [...readings].reverse();
+    const header = `<p class="meter-history-meta">Showing latest ${rows.length} reading${rows.length === 1 ? "" : "s"}</p>`;
+    list.innerHTML =
+      header +
+      rows
+        .map((r) => {
+          const baseline = isBaselineReading(readings, r);
+          const gapNote =
+            !baseline && r.gapDays > 1
+              ? `<br><small style="color:#8a6d1d">Covers ${r.gapDays} days since previous reading</small>`
+              : "";
+          const baselineNote = baseline
+            ? `<br><small style="color: var(--primary-color)">Starting point — usage begins from your next reading</small>`
+            : "";
+          const usageLabel = baseline
+            ? `<span style="color: var(--text-muted); font-weight: 600;">Baseline</span>`
+            : `<div class="meter-usage">${formatMeterNumber(r.usage)} ${unit}</div>`;
+          return `
+        <div class="meter-history-row" id="meter-hist-${r.date}">
+          <div>
+            <strong style="color: var(--primary-color)">${r.date}</strong>
+            <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
+              Meter reading: ${formatMeterNumber(r.reading)} ${unit}
+              ${baselineNote}${gapNote}
+            </div>
+          </div>
+          ${usageLabel}
+        </div>`;
+        })
+        .join("");
+  } catch (error) {
+    console.error(error);
+    list.innerHTML =
+      '<p style="color: red">Failed to load history.</p>';
+  }
+};
+
+window.renderMeterChart = async function (options = {}) {
+  const canvasId = options.canvasId || "meterUsageChart";
+  const isFullscreen = canvasId === "meterFsCanvas";
+  const type = document.getElementById("meterChartType").value;
+  const emptyEl = document.getElementById("meterChartEmpty");
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  initMeterDateInputs();
+  const range = readMeterDateRange("meterFromDate", "meterToDate");
+  if (!range) return;
+
+  const { startDate, endDate, labels } = range;
+  const unit = METER_UNITS[type];
+
+  const destroyChart = () => {
+    if (isFullscreen) {
+      if (meterFsChart) {
+        meterFsChart.destroy();
+        meterFsChart = null;
+      }
+    } else if (meterUsageChart) {
+      meterUsageChart.destroy();
+      meterUsageChart = null;
+    }
+  };
+
+  try {
+    const all = await fetchMeterReadingsByType(type);
+    const inRange = all.filter((r) => r.date >= startDate && r.date <= endDate);
+
+    const allByUser = {};
+    for (const r of all) {
+      if (!allByUser[r.userId]) allByUser[r.userId] = [];
+      allByUser[r.userId].push(r);
+    }
+    Object.keys(allByUser).forEach((uid) => {
+      allByUser[uid].sort((a, b) => a.date.localeCompare(b.date));
+    });
+
+    const byUser = {};
+    for (const r of inRange) {
+      const userAll = allByUser[r.userId] || [];
+      if (isBaselineReading(userAll, r)) continue;
+
+      if (!byUser[r.userId]) {
+        byUser[r.userId] = { name: r.userName || "User", points: {} };
+      }
+      byUser[r.userId].name = r.userName || byUser[r.userId].name;
+      byUser[r.userId].points[r.date] = r.usage;
+    }
+
+    const userIds = Object.keys(byUser);
+    if (!userIds.length) {
+      destroyChart();
+      if (!isFullscreen && emptyEl) {
+        canvas.style.display = "none";
+        emptyEl.style.display = "block";
+        emptyEl.innerText = "No submissions in this date range yet.";
+      }
+      return;
+    }
+
+    canvas.style.display = "block";
+    if (!isFullscreen && emptyEl) emptyEl.style.display = "none";
+    applyMeterChartTouchLayout(canvas, labels.length);
+
+    const displayLabels = labels.map((d) => d.slice(5));
+    const pointStyle = meterTouchPointStyle(labels.length);
+    const datasets = userIds.map((uid, i) => {
+      const color = meterChartColor(i);
+      return {
+        label: byUser[uid].name,
+        data: labels.map((d) =>
+          Object.prototype.hasOwnProperty.call(byUser[uid].points, d)
+            ? byUser[uid].points[d]
+            : null,
+        ),
+        borderColor: color,
+        backgroundColor: color,
+        spanGaps: false,
+        tension: 0.25,
+        borderWidth: pointStyle.borderWidth,
+        pointRadius: pointStyle.pointRadius,
+        pointHoverRadius: pointStyle.pointHoverRadius,
+        pointHitRadius: pointStyle.pointHitRadius,
+      };
+    });
+
+    destroyChart();
+
+    const chart = new window.Chart(canvas, {
+      type: "line",
+      data: { labels: displayLabels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "nearest", intersect: false },
+        events: [
+          "mousemove",
+          "mouseout",
+          "click",
+          "touchstart",
+          "touchmove",
+          "touchend",
+        ],
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              usePointStyle: true,
+              padding: isCompactMeterViewport() ? 16 : 10,
+              font: { size: isCompactMeterViewport() ? 13 : 12 },
+            },
+          },
+          tooltip: {
+            titleFont: { size: isCompactMeterViewport() ? 14 : 12 },
+            bodyFont: { size: isCompactMeterViewport() ? 14 : 12 },
+            padding: isCompactMeterViewport() ? 12 : 8,
+            callbacks: {
+              title(items) {
+                if (!items.length) return "";
+                return labels[items[0].dataIndex] || items[0].label;
+              },
+              label(ctx) {
+                if (ctx.parsed.y === null) return null;
+                return `${ctx.dataset.label}: ${formatMeterNumber(ctx.parsed.y)} ${unit}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "Date" },
+            ticks: {
+              maxRotation: 45,
+              autoSkip: true,
+              maxTicksLimit:
+                labels.length <= 14 ? labels.length : Math.min(labels.length, 16),
+              font: { size: isCompactMeterViewport() ? 11 : 12 },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: `Usage (${unit})` },
+          },
+        },
+      },
+    });
+
+    if (isFullscreen) meterFsChart = chart;
+    else meterUsageChart = chart;
+  } catch (error) {
+    console.error(error);
+    if (!isFullscreen && emptyEl) {
+      emptyEl.style.display = "block";
+      emptyEl.innerText = "Failed to load community chart.";
+      canvas.style.display = "none";
+    }
+  }
+};
+
+async function ensureCachedUsersForMeters() {
+  if (meterCachedUsers.length) return;
+  const snap = await getDocs(query(collection(db, "users")));
+  meterCachedUsers = [];
+  snap.forEach((d) => {
+    const data = d.data();
+    meterCachedUsers.push({
+      uid: d.id,
+      name: data.name || "Unnamed",
+      role: data.role || "user",
+      email: data.email || "",
+    });
+  });
+  meterCachedUsers.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
+}
+
+window.filterAdminMeterUsers = async function () {
+  if (!meterCachedUsers.length) await ensureCachedUsersForMeters();
+
+  const term = document
+    .getElementById("adminMeterUserSearch")
+    .value.trim()
+    .toLowerCase();
+  const box = document.getElementById("adminMeterUserResults");
+  if (!term) {
+    box.innerHTML = "";
+    adminMeterUserMatches = [];
+    return;
+  }
+  adminMeterUserMatches = meterCachedUsers
+    .filter((u) => (u.name || "").toLowerCase().includes(term))
+    .slice(0, 12);
+  box.innerHTML = adminMeterUserMatches
+    .map((u, i) => {
+      const roleLabel = u.role ? u.role : "user";
+      return `<span class="admin-meter-user-chip" onclick="selectAdminMeterUser(${i})">${u.name} <small>(${roleLabel})</small></span>`;
+    })
+    .join("");
+};
+
+window.selectAdminMeterUser = function (index) {
+  adminMeterTargetUser = adminMeterUserMatches[index];
+  if (!adminMeterTargetUser) return;
+  document.getElementById("adminMeterSelected").style.display = "block";
+  document.getElementById("adminMeterSelectedName").innerText =
+    adminMeterTargetUser.name;
+  document.getElementById("adminMeterDate").value = getLocalDateString();
+  document.getElementById("adminMeterReading").value = "";
+  document.getElementById("adminMeterUserSearch").value =
+    adminMeterTargetUser.name;
+  document.getElementById("adminMeterUserResults").innerHTML = "";
+  loadAdminMeterHistory();
+};
+
+window.loadAdminMeterUser = async function () {
+  await ensureCachedUsersForMeters();
+  const term = document
+    .getElementById("adminMeterUserSearch")
+    .value.trim()
+    .toLowerCase();
+  if (!term) return showToast("Search for a user first.", "error");
+  const match =
+    meterCachedUsers.find((u) => (u.name || "").toLowerCase() === term) ||
+    meterCachedUsers.find((u) => (u.name || "").toLowerCase().includes(term));
+  if (!match) return showToast("No matching user found.", "error");
+  adminMeterTargetUser = match;
+  document.getElementById("adminMeterSelected").style.display = "block";
+  document.getElementById("adminMeterSelectedName").innerText = match.name;
+  document.getElementById("adminMeterDate").value = getLocalDateString();
+  loadAdminMeterHistory();
+};
+
+async function loadAdminMeterHistory() {
+  if (!adminMeterTargetUser) return;
+  const type = document.getElementById("adminMeterType").value;
+  const list = document.getElementById("adminMeterHistoryList");
+  list.innerHTML = '<p style="color: var(--text-muted)">Loading...</p>';
+
+  try {
+    const readings = await fetchMeterReadingsForUser(
+      adminMeterTargetUser.uid,
+      type,
+      { limitCount: METER_HISTORY_LIMIT },
+    );
+    const unit = METER_UNITS[type];
+    if (!readings.length) {
+      list.innerHTML =
+        '<p style="color: var(--text-muted)">No readings for this meter.</p>';
+      return;
+    }
+
+    const rows = [...readings].reverse();
+    list.innerHTML =
+      `<p class="meter-history-meta">Showing latest ${rows.length} reading${rows.length === 1 ? "" : "s"}</p>` +
+      rows
+        .map((r) => {
+          const baseline = isBaselineReading(readings, r);
+          const gapNote =
+            !baseline && r.gapDays > 1
+              ? `<br><small style="color:#8a6d1d">Covers ${r.gapDays} days</small>`
+              : "";
+          const usageText = baseline
+            ? `<span style="color: var(--text-muted)">Baseline (starting point)</span>`
+            : `Usage: ${formatMeterNumber(r.usage)} ${unit}`;
+          return `
+        <div class="meter-history-row">
+          <div>
+            <strong style="color: var(--primary-color)">${r.date}</strong>
+            <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
+              Reading: ${formatMeterNumber(r.reading)} ${unit} · ${usageText}
+              ${gapNote}
+            </div>
+          </div>
+          <div class="meter-history-actions">
+            <button class="outline-btn small-btn" style="margin:0;width:auto;padding:6px 12px"
+              onclick="adminEditMeterReading('${r.date}', ${r.reading})">Edit</button>
+            <button class="action-btn small-btn" style="margin:0;width:auto;padding:6px 12px;background:var(--error-color);color:#fff;box-shadow:none"
+              onclick="promptDeleteMeterReading('${r.id}')">Delete</button>
+          </div>
+        </div>`;
+        })
+        .join("");
+  } catch (error) {
+    console.error(error);
+    list.innerHTML = '<p style="color: red">Failed to load readings.</p>';
+  }
+}
+
+document.getElementById("adminMeterType")?.addEventListener("change", () => {
+  if (adminMeterTargetUser) loadAdminMeterHistory();
+});
+
+window.adminEditMeterReading = function (date, reading) {
+  document.getElementById("adminMeterDate").value = date;
+  document.getElementById("adminMeterReading").value = reading;
+  document.getElementById("adminMeterReading").focus();
+};
+
+window.adminSaveMeterReading = async function () {
+  if (!adminMeterTargetUser)
+    return showToast("Select a user first.", "error");
+  if (activeUserData.role !== "admin")
+    return showToast("Admin only.", "error");
+
+  const type = document.getElementById("adminMeterType").value;
+  const date = document.getElementById("adminMeterDate").value;
+  const raw = document.getElementById("adminMeterReading").value;
+  if (!date) return showToast("Pick a date.", "error");
+  if (raw === "" || raw === null)
+    return showToast("Enter a meter reading.", "error");
+
+  const reading = Number(raw);
+  if (Number.isNaN(reading) || reading < 0)
+    return showToast("Please enter a valid non-negative number.", "error");
+
+  try {
+    await saveMeterReadingRecord({
+      userId: adminMeterTargetUser.uid,
+      userName: adminMeterTargetUser.name,
+      type,
+      date,
+      reading,
+    });
+    showToast("Reading saved.", "success");
+    document.getElementById("adminMeterReading").value = "";
+    await loadAdminMeterHistory();
+    await renderMeterChart();
+    if (adminMeterTargetUser.uid === activeUserData.uid) {
+      await refreshMeterSubmitPanel();
+      await renderMyMeterChart();
+      await showMyMeterHistory(myMeterHistoryType);
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Failed to save.", "error");
+  }
+};
+
+window.promptDeleteMeterReading = function (docId) {
+  pendingMeterDeleteId = docId;
+  document.getElementById("meterDeleteModal").style.display = "flex";
+};
+
+window.closeMeterDeleteModal = function () {
+  pendingMeterDeleteId = null;
+  document.getElementById("meterDeleteModal").style.display = "none";
+};
+
+window.confirmDeleteMeterReading = async function () {
+  if (!pendingMeterDeleteId || activeUserData.role !== "admin") {
+    closeMeterDeleteModal();
+    return;
+  }
+
+  try {
+    const ref = doc(db, "meterReadings", pendingMeterDeleteId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      showToast("Reading already deleted.", "error");
+      closeMeterDeleteModal();
+      return;
+    }
+
+    const data = snap.data();
+    await deleteDoc(ref);
+
+    // Recalculate next reading after deletion
+    const readings = await fetchMeterReadingsForUser(data.userId, data.type);
+    const next = findNextReading(readings, data.date);
+    if (next) {
+      const prev = findPreviousReading(readings, next.date);
+      const nextUsage = prev
+        ? Number((next.reading - prev.reading).toFixed(3))
+        : 0;
+      await updateDoc(doc(db, "meterReadings", next.id), {
+        usage: nextUsage,
+        gapDays: prev ? daysBetween(prev.date, next.date) : 0,
+        isBaseline: !prev,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    showToast("Reading deleted.", "success");
+    closeMeterDeleteModal();
+    await loadAdminMeterHistory();
+    await renderMeterChart();
+    if (data.userId === activeUserData.uid) {
+      await refreshMeterSubmitPanel();
+      await renderMyMeterChart();
+      await showMyMeterHistory(myMeterHistoryType);
+    }
+  } catch (error) {
+    console.error(error);
+    showToast("Failed to delete reading.", "error");
+    closeMeterDeleteModal();
   }
 };

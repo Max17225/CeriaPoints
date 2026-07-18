@@ -6,6 +6,7 @@
     <title>CeriaPoints</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="icon" type="image/png" href="pictures/favicon.png" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   </head>
   <body>
     <div id="initialLoader" class="initial-loader">
@@ -265,6 +266,13 @@
             onclick="switchRole('weigherPage')"
           >
             Weigher Terminal
+          </button>
+          <button
+            class="nav-btn"
+            id="navMeters"
+            onclick="switchRole('metersPage')"
+          >
+            Meters
           </button>
           <button
             class="nav-btn"
@@ -794,6 +802,244 @@
           </div>
         </div>
 
+        <div id="metersPage" class="page" style="display: none">
+          <h2>Meter Readings</h2>
+          <p class="form-subtext" style="margin-top: 0">
+            Enter the number shown on your home electricity and water meters.
+            Your first save is a <strong>baseline</strong> (starting point). From
+            the next day onward, usage = today’s reading − previous reading.
+          </p>
+
+          <div class="card meter-submit-card">
+            <h3 style="margin-top: 0; margin-bottom: 8px">Submit Today's Reading</h3>
+            <p id="meterTodayLabel" class="form-subtext" style="margin-bottom: 20px">
+              Today
+            </p>
+            <div class="meter-input-grid">
+              <div class="meter-input-block">
+                <h4 class="form-section-title">Electricity (kWh)</h4>
+                <p id="electricityPrevInfo" class="meter-prev-info">
+                  No previous reading yet
+                </p>
+                <div id="electricityGapNotice" class="meter-gap-notice" style="display: none"></div>
+                <label for="electricityReadingInput">Today's meter reading</label>
+                <input
+                  type="number"
+                  id="electricityReadingInput"
+                  class="large-input"
+                  placeholder="e.g. 12462.8"
+                  min="0"
+                  step="0.01"
+                />
+                <button
+                  class="action-btn"
+                  style="margin-top: 15px"
+                  onclick="submitMeterReading('electricity')"
+                >
+                  Save Electricity
+                </button>
+              </div>
+              <div class="meter-input-block">
+                <h4 class="form-section-title">Water (m³)</h4>
+                <p id="waterPrevInfo" class="meter-prev-info">
+                  No previous reading yet
+                </p>
+                <div id="waterGapNotice" class="meter-gap-notice" style="display: none"></div>
+                <label for="waterReadingInput">Today's meter reading</label>
+                <input
+                  type="number"
+                  id="waterReadingInput"
+                  class="large-input"
+                  placeholder="e.g. 312.45"
+                  min="0"
+                  step="0.01"
+                />
+                <button
+                  class="action-btn"
+                  style="margin-top: 15px"
+                  onclick="submitMeterReading('water')"
+                >
+                  Save Water
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="meter-chart-header">
+              <h3 style="margin: 0">My Usage</h3>
+              <div class="meter-chart-controls">
+                <select id="myMeterChartType" onchange="renderMyMeterChart()">
+                  <option value="electricity">Electricity (kWh)</option>
+                  <option value="water">Water (m³)</option>
+                </select>
+                <button
+                  type="button"
+                  class="outline-btn small-btn meter-expand-btn"
+                  onclick="openMeterChartFullscreen('my')"
+                  title="Expand chart"
+                >
+                  Expand
+                </button>
+              </div>
+            </div>
+            <div class="meter-date-range">
+              <label for="myMeterFromDate">From</label>
+              <input type="date" id="myMeterFromDate" />
+              <label for="myMeterToDate">To</label>
+              <input type="date" id="myMeterToDate" />
+              <button
+                type="button"
+                class="action-btn small-btn"
+                style="margin-top: 0; width: auto; padding: 10px 16px"
+                onclick="renderMyMeterChart()"
+              >
+                Show
+              </button>
+            </div>
+            <p class="form-subtext" style="margin-bottom: 15px">
+              Your personal usage only. Defaults to <strong>today</strong> —
+              change From / To and press Show. On small screens, swipe the chart
+              sideways or tap <strong>Expand</strong> for a full-screen view.
+              Tap a point to open that day in My History.
+            </p>
+            <div class="meter-chart-scroll">
+              <div class="meter-chart-wrap" id="myMeterChartWrap">
+                <canvas id="myMeterUsageChart"></canvas>
+              </div>
+            </div>
+            <p id="myMeterChartEmpty" class="meter-chart-empty" style="display: none">
+              No personal readings in this view yet.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="meter-chart-header">
+              <h3 style="margin: 0">Community Usage</h3>
+              <div class="meter-chart-controls">
+                <select id="meterChartType" onchange="renderMeterChart()">
+                  <option value="electricity">Electricity (kWh)</option>
+                  <option value="water">Water (m³)</option>
+                </select>
+                <button
+                  type="button"
+                  class="outline-btn small-btn meter-expand-btn"
+                  onclick="openMeterChartFullscreen('community')"
+                  title="Expand chart"
+                >
+                  Expand
+                </button>
+              </div>
+            </div>
+            <div class="meter-date-range">
+              <label for="meterFromDate">From</label>
+              <input type="date" id="meterFromDate" />
+              <label for="meterToDate">To</label>
+              <input type="date" id="meterToDate" />
+              <button
+                type="button"
+                class="action-btn small-btn"
+                style="margin-top: 0; width: auto; padding: 10px 16px"
+                onclick="renderMeterChart()"
+              >
+                Show
+              </button>
+            </div>
+            <p class="form-subtext" style="margin-bottom: 15px">
+              Compare everyone’s usage for the dates you pick. Each coloured
+              line is one person who submitted. On small screens, swipe sideways
+              or tap <strong>Expand</strong>. Baseline readings are hidden;
+              missing days show as gaps.
+            </p>
+            <div class="meter-chart-scroll">
+              <div class="meter-chart-wrap" id="meterChartWrap">
+                <canvas id="meterUsageChart"></canvas>
+              </div>
+            </div>
+            <p id="meterChartEmpty" class="meter-chart-empty" style="display: none">
+              No submissions in this period yet.
+            </p>
+          </div>
+
+          <div class="card" style="text-align: left">
+            <h3 style="margin-top: 0; margin-bottom: 8px">My History</h3>
+            <p class="form-subtext" style="margin-bottom: 12px">
+              Your latest meter entries (most recent first). Shows up to
+              30 readings per meter type.
+            </p>
+            <div class="meter-history-tabs">
+              <button
+                class="outline-btn small-btn meter-hist-tab active"
+                id="meterHistTabElectricity"
+                onclick="showMyMeterHistory('electricity')"
+              >
+                Electricity
+              </button>
+              <button
+                class="outline-btn small-btn meter-hist-tab"
+                id="meterHistTabWater"
+                onclick="showMyMeterHistory('water')"
+              >
+                Water
+              </button>
+            </div>
+            <div id="myMeterHistoryList">
+              <p style="color: var(--text-muted)">Loading...</p>
+            </div>
+          </div>
+
+          <div id="adminMetersSection" class="card" style="text-align: left; display: none">
+            <h3 style="margin-top: 0; margin-bottom: 8px">Admin: Manage Readings</h3>
+            <p class="form-subtext">
+              Search a user to edit, delete, or add a backdated reading. History
+              here also shows the latest 30 entries.
+            </p>
+            <div class="admin-meter-toolbar">
+              <input
+                type="text"
+                id="adminMeterUserSearch"
+                placeholder="Search user by name..."
+                oninput="filterAdminMeterUsers()"
+              />
+              <select id="adminMeterType">
+                <option value="electricity">Electricity</option>
+                <option value="water">Water</option>
+              </select>
+              <button class="action-btn small-btn" style="margin-top: 0; width: auto" onclick="loadAdminMeterUser()">
+                Load
+              </button>
+            </div>
+            <div id="adminMeterUserResults" class="admin-meter-search-results"></div>
+            <div id="adminMeterSelected" class="admin-meter-selected" style="display: none">
+              <p>
+                Managing:
+                <strong id="adminMeterSelectedName"></strong>
+              </p>
+              <div class="admin-meter-backdate">
+                <h4 class="form-section-title">Add / Update Reading</h4>
+                <div class="admin-meter-backdate-row">
+                  <input type="date" id="adminMeterDate" />
+                  <input
+                    type="number"
+                    id="adminMeterReading"
+                    placeholder="Meter reading"
+                    min="0"
+                    step="0.01"
+                  />
+                  <button
+                    class="action-btn small-btn"
+                    style="margin-top: 0; width: auto"
+                    onclick="adminSaveMeterReading()"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+              <div id="adminMeterHistoryList"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="historyPage" class="page" style="display: none">
           <h2>Transaction History</h2>
           <div class="card" style="text-align: left">
@@ -1095,6 +1341,28 @@
       </div>
     </div>
 
+    <div id="meterChartFullscreen" class="meter-fs-overlay" style="display: none">
+      <div class="meter-fs-panel">
+        <div class="meter-fs-toolbar">
+          <h3 id="meterFsTitle" style="margin: 0">Chart</h3>
+          <button
+            type="button"
+            class="action-btn small-btn meter-fs-close"
+            onclick="closeMeterChartFullscreen()"
+          >
+            Close
+          </button>
+        </div>
+        <p class="meter-fs-hint">
+          Tip: rotate your phone to landscape for the widest view. Tap a point
+          for details.
+        </p>
+        <div class="meter-fs-chart-wrap">
+          <canvas id="meterFsCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div id="logoutModal" class="modal-overlay" style="display: none">
       <div class="card modal-card">
         <h3 style="margin-top: 0; color: var(--primary-color)">Log Out</h3>
@@ -1122,6 +1390,40 @@
             onclick="confirmLogout()"
           >
             Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="meterDeleteModal" class="modal-overlay" style="display: none">
+      <div class="card modal-card">
+        <h3 style="margin-top: 0; color: var(--error-color)">Delete Reading</h3>
+        <p style="color: var(--text-muted); margin-bottom: 25px">
+          Delete this meter reading? The next reading for this user will be
+          recalculated.
+        </p>
+        <div style="display: flex; gap: 15px">
+          <button
+            class="outline-btn"
+            style="width: 50%; margin: 0; padding: 12px"
+            onclick="closeMeterDeleteModal()"
+          >
+            Cancel
+          </button>
+          <button
+            class="action-btn"
+            style="
+              width: 50%;
+              margin: 0;
+              padding: 12px;
+              background-color: var(--error-color);
+              color: white;
+              border: none;
+              box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);
+            "
+            onclick="confirmDeleteMeterReading()"
+          >
+            Delete
           </button>
         </div>
       </div>
