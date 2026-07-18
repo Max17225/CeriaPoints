@@ -37,18 +37,18 @@ service cloud.firestore {
     match /meterReadings/{readingId} {
       allow read: if isAuthenticated();
 
-      // Own readings, or admin managing anyone
+      // Own readings, or staff managing anyone
       allow create: if isAuthenticated()
-        && (request.resource.data.userId == request.auth.uid || isAdmin());
+        && (request.resource.data.userId == request.auth.uid || isStaff());
 
       allow update: if isAuthenticated()
         && (
           (resource.data.userId == request.auth.uid
             && request.resource.data.userId == request.auth.uid)
-          || isAdmin()
+          || isStaff()
         );
 
-      allow delete: if isAdmin();
+      allow delete: if isStaff();
     }
 
     match /{document=**} {

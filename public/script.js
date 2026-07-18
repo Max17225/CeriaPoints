@@ -1445,10 +1445,11 @@ window.loadMetersPage = async function () {
   const today = getLocalDateString();
   document.getElementById("meterTodayLabel").innerText = `Today · ${today}`;
 
-  const adminSection = document.getElementById("adminMetersSection");
-  if (adminSection) {
-    adminSection.style.display =
-      activeUserData.role === "admin" ? "block" : "none";
+  const manageSection = document.getElementById("adminMetersSection");
+  const isStaff =
+    activeUserData.role === "admin" || activeUserData.role === "weigher";
+  if (manageSection) {
+    manageSection.style.display = isStaff ? "block" : "none";
   }
 
   initMeterDateInputs();
@@ -1457,7 +1458,7 @@ window.loadMetersPage = async function () {
   await showMyMeterHistory(myMeterHistoryType);
   await renderMeterChart();
 
-  if (activeUserData.role === "admin") {
+  if (isStaff) {
     await ensureCachedUsersForMeters();
   }
 };
@@ -2181,11 +2182,17 @@ window.adminEditMeterReading = function (date, reading) {
   document.getElementById("adminMeterReading").focus();
 };
 
+function isMeterStaff() {
+  return (
+    activeUserData &&
+    (activeUserData.role === "admin" || activeUserData.role === "weigher")
+  );
+}
+
 window.adminSaveMeterReading = async function () {
   if (!adminMeterTargetUser)
     return showToast("Select a user first.", "error");
-  if (activeUserData.role !== "admin")
-    return showToast("Admin only.", "error");
+  if (!isMeterStaff()) return showToast("Staff only.", "error");
 
   const type = document.getElementById("adminMeterType").value;
   const date = document.getElementById("adminMeterDate").value;
@@ -2232,7 +2239,7 @@ window.closeMeterDeleteModal = function () {
 };
 
 window.confirmDeleteMeterReading = async function () {
-  if (!pendingMeterDeleteId || activeUserData.role !== "admin") {
+  if (!pendingMeterDeleteId || !isMeterStaff()) {
     closeMeterDeleteModal();
     return;
   }

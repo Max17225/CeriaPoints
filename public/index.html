@@ -803,18 +803,18 @@
         </div>
 
         <div id="metersPage" class="page" style="display: none">
-          <h2>Meter Readings</h2>
-          <p class="form-subtext" style="margin-top: 0">
-            Enter the number shown on your home electricity and water meters.
-            Your first save is a <strong>baseline</strong> (starting point). From
-            the next day onward, usage = today’s reading − previous reading.
-          </p>
-
-          <div class="card meter-submit-card">
-            <h3 style="margin-top: 0; margin-bottom: 8px">Submit Today's Reading</h3>
-            <p id="meterTodayLabel" class="form-subtext" style="margin-bottom: 20px">
-              Today
+          <header class="meter-page-header">
+            <h2>Meter Readings</h2>
+            <p class="meter-page-intro">
+              Type the number on your home meter. First save = starting point.
+              Later saves calculate usage automatically.
             </p>
+          </header>
+
+          <section class="card meter-section meter-section--input">
+            <div class="meter-section-label">Input Electricity/Water Reading</div>
+            <h3 class="meter-section-title">Submit today</h3>
+            <p id="meterTodayLabel" class="meter-section-date">Today</p>
             <div class="meter-input-grid">
               <div class="meter-input-block">
                 <h4 class="form-section-title">Electricity (kWh)</h4>
@@ -822,7 +822,7 @@
                   No previous reading yet
                 </p>
                 <div id="electricityGapNotice" class="meter-gap-notice" style="display: none"></div>
-                <label for="electricityReadingInput">Today's meter reading</label>
+                <label for="electricityReadingInput">Meter reading</label>
                 <input
                   type="number"
                   id="electricityReadingInput"
@@ -845,7 +845,7 @@
                   No previous reading yet
                 </p>
                 <div id="waterGapNotice" class="meter-gap-notice" style="display: none"></div>
-                <label for="waterReadingInput">Today's meter reading</label>
+                <label for="waterReadingInput">Meter reading</label>
                 <input
                   type="number"
                   id="waterReadingInput"
@@ -863,25 +863,16 @@
                 </button>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div class="card">
+          <section class="card meter-section meter-section--chart">
+            <div class="meter-section-label">View Your Usage</div>
             <div class="meter-chart-header">
-              <h3 style="margin: 0">My Usage</h3>
-              <div class="meter-chart-controls">
-                <select id="myMeterChartType" onchange="renderMyMeterChart()">
-                  <option value="electricity">Electricity (kWh)</option>
-                  <option value="water">Water (m³)</option>
-                </select>
-                <button
-                  type="button"
-                  class="outline-btn small-btn meter-expand-btn"
-                  onclick="openMeterChartFullscreen('my')"
-                  title="Expand chart"
-                >
-                  Expand
-                </button>
-              </div>
+              <h3 class="meter-section-title">My Usage</h3>
+              <select id="myMeterChartType" onchange="renderMyMeterChart()">
+                <option value="electricity">Electricity (kWh)</option>
+                <option value="water">Water (m³)</option>
+              </select>
             </div>
             <div class="meter-date-range">
               <label for="myMeterFromDate">From</label>
@@ -890,46 +881,45 @@
               <input type="date" id="myMeterToDate" />
               <button
                 type="button"
-                class="action-btn small-btn"
-                style="margin-top: 0; width: auto; padding: 10px 16px"
+                class="action-btn small-btn meter-show-btn"
                 onclick="renderMyMeterChart()"
               >
                 Show
               </button>
             </div>
-            <p class="form-subtext" style="margin-bottom: 15px">
-              Your personal usage only. Defaults to <strong>today</strong> —
-              change From / To and press Show. On small screens, swipe the chart
-              sideways or tap <strong>Expand</strong> for a full-screen view.
-              Tap a point to open that day in My History.
+            <p class="meter-section-hint">
+              Defaults to today. Swipe the graph if crowded; use the expand icon
+              for full screen. Tap a point to open that day below.
             </p>
-            <div class="meter-chart-scroll">
-              <div class="meter-chart-wrap" id="myMeterChartWrap">
-                <canvas id="myMeterUsageChart"></canvas>
+            <div class="meter-chart-frame">
+              <button
+                type="button"
+                class="meter-expand-fab"
+                onclick="openMeterChartFullscreen('my')"
+                title="Full screen"
+                aria-label="Expand chart to full screen"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              </button>
+              <div class="meter-chart-scroll">
+                <div class="meter-chart-wrap" id="myMeterChartWrap">
+                  <canvas id="myMeterUsageChart"></canvas>
+                </div>
               </div>
+              <p id="myMeterChartEmpty" class="meter-chart-empty" style="display: none">
+                No personal readings in this view yet.
+              </p>
             </div>
-            <p id="myMeterChartEmpty" class="meter-chart-empty" style="display: none">
-              No personal readings in this view yet.
-            </p>
-          </div>
+          </section>
 
-          <div class="card">
+          <section class="card meter-section meter-section--chart meter-section--community">
+            <div class="meter-section-label">View Everyone's Usage</div>
             <div class="meter-chart-header">
-              <h3 style="margin: 0">Community Usage</h3>
-              <div class="meter-chart-controls">
-                <select id="meterChartType" onchange="renderMeterChart()">
-                  <option value="electricity">Electricity (kWh)</option>
-                  <option value="water">Water (m³)</option>
-                </select>
-                <button
-                  type="button"
-                  class="outline-btn small-btn meter-expand-btn"
-                  onclick="openMeterChartFullscreen('community')"
-                  title="Expand chart"
-                >
-                  Expand
-                </button>
-              </div>
+              <h3 class="meter-section-title">Community Usage</h3>
+              <select id="meterChartType" onchange="renderMeterChart()">
+                <option value="electricity">Electricity (kWh)</option>
+                <option value="water">Water (m³)</option>
+              </select>
             </div>
             <div class="meter-date-range">
               <label for="meterFromDate">From</label>
@@ -938,34 +928,42 @@
               <input type="date" id="meterToDate" />
               <button
                 type="button"
-                class="action-btn small-btn"
-                style="margin-top: 0; width: auto; padding: 10px 16px"
+                class="action-btn small-btn meter-show-btn"
                 onclick="renderMeterChart()"
               >
                 Show
               </button>
             </div>
-            <p class="form-subtext" style="margin-bottom: 15px">
-              Compare everyone’s usage for the dates you pick. Each coloured
-              line is one person who submitted. On small screens, swipe sideways
-              or tap <strong>Expand</strong>. Baseline readings are hidden;
-              missing days show as gaps.
+            <p class="meter-section-hint">
+              One coloured line per person who submitted. Swipe or expand on
+              small screens.
             </p>
-            <div class="meter-chart-scroll">
-              <div class="meter-chart-wrap" id="meterChartWrap">
-                <canvas id="meterUsageChart"></canvas>
+            <div class="meter-chart-frame">
+              <button
+                type="button"
+                class="meter-expand-fab"
+                onclick="openMeterChartFullscreen('community')"
+                title="Full screen"
+                aria-label="Expand community chart to full screen"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              </button>
+              <div class="meter-chart-scroll">
+                <div class="meter-chart-wrap" id="meterChartWrap">
+                  <canvas id="meterUsageChart"></canvas>
+                </div>
               </div>
+              <p id="meterChartEmpty" class="meter-chart-empty" style="display: none">
+                No submissions in this period yet.
+              </p>
             </div>
-            <p id="meterChartEmpty" class="meter-chart-empty" style="display: none">
-              No submissions in this period yet.
-            </p>
-          </div>
+          </section>
 
-          <div class="card" style="text-align: left">
-            <h3 style="margin-top: 0; margin-bottom: 8px">My History</h3>
-            <p class="form-subtext" style="margin-bottom: 12px">
-              Your latest meter entries (most recent first). Shows up to
-              30 readings per meter type.
+          <section class="card meter-section meter-section--history">
+            <div class="meter-section-label">Your list</div>
+            <h3 class="meter-section-title">My History</h3>
+            <p class="meter-section-hint">
+              Latest 30 entries, newest first.
             </p>
             <div class="meter-history-tabs">
               <button
@@ -986,13 +984,18 @@
             <div id="myMeterHistoryList">
               <p style="color: var(--text-muted)">Loading...</p>
             </div>
-          </div>
+          </section>
 
-          <div id="adminMetersSection" class="card" style="text-align: left; display: none">
-            <h3 style="margin-top: 0; margin-bottom: 8px">Admin: Manage Readings</h3>
-            <p class="form-subtext">
-              Search a user to edit, delete, or add a backdated reading. History
-              here also shows the latest 30 entries.
+          <section
+            id="adminMetersSection"
+            class="card meter-section meter-section--manage"
+            style="display: none"
+          >
+            <div class="meter-section-label">Staff tools</div>
+            <h3 class="meter-section-title">Manage Readings</h3>
+            <p class="meter-section-hint">
+              Search a user to edit, delete, or add a backdated reading (latest
+              30 shown).
             </p>
             <div class="admin-meter-toolbar">
               <input
@@ -1037,7 +1040,7 @@
               </div>
               <div id="adminMeterHistoryList"></div>
             </div>
-          </div>
+          </section>
         </div>
 
         <div id="historyPage" class="page" style="display: none">
