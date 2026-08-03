@@ -820,6 +820,187 @@ window.exportLeaderboardCSV = async function () {
   }
 };
 
+/** Parse transaction timestamp strings (locale varies by browser). */
+function parseTransactionDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === "function") {
+    try {
+      return ts.toDate();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  if (ts instanceof Date && !isNaN(ts.getTime())) return ts;
+
+  const str = String(ts).trim();
+  const isoTry = new Date(str);
+  if (!isNaN(isoTry.getTime())) return isoTry;
+
+  // e.g. 18/07/2026 or 7/18/2026 (± time after)
+  const m = str.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (!m) return null;
+  const a = parseInt(m[1], 10);
+  const b = parseInt(m[2], 10);
+  const y = parseInt(m[3], 10);
+  if (a > 12) return new Date(y, b - 1, a); // D/M/Y
+  if (b > 12) return new Date(y, a - 1, b); // M/D/Y
+  // Ambiguous: prefer D/M/Y (Malaysia)
+  return new Date(y, b - 1, a);
+}
+
+function isDateInYearMonth(dateObj, year, month1to12) {
+  if (!dateObj || isNaN(dateObj.getTime())) return false;
+  return (
+    dateObj.getFullYear() === year && dateObj.getMonth() + 1 === month1to12
+  );
+}
+
+/**
+ * Rebuild leaderboard for a past month from transactions
+ * (normal export only does "this month").
+ */
+window.exportPastMonthLeaderboardCSV = async function () {
+  if (!activeUserData || activeUserData.role !== "admin") {
+    return showToast("Admin only.", "error");
+  }
+
+  const input = document.getElementById("pastMonthExportInput");
+  const ym = (input && input.value) || "2026-07";
+  const parts = ym.split("-");
+  if (parts.length !== 2) return showToast("Pick a valid month.", "error");
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  if (!year || !month || month < 1 || month > 12) {
+    return showToast("Pick a valid month.", "error");
+  }
+
+  const monthLabel = ym; // 2026-07
+  showToast(`Building ${monthLabel} leaderboard from weigh-ins...`, "info");
+
+  try {
+    const txSnap = await getDocs(collection(db, "transactions"));
+    const byStudent = {};
+    let matchedTx = 0;
+    let skippedTx = 0;
+
+    txSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      const d = parseTransactionDate(data.timestamp);
+      if (!isDateInYearMonth(d, year, month)) {
+        skippedTx++;
+        return;
+      }
+      matchedTx++;
+      const id = data.studentId || data.studentName || docSnap.id;
+      if (!byStudent[id]) {
+        byStudent[id] = {
+          name: data.studentName || "Unknown",
+          score: 0,
+          materials: {},
+        };
+      }
+      byStudent[id].name = data.studentName || byStudent[id].name;
+      byStudent[id].score += Number(data.pointsAwarded) || 0;
+      const mat = data.material || "other";
+      byStudent[id].materials[mat] =
+        (byStudent[id].materials[mat] || 0) + (Number(data.weightKg) || 0);
+    });
+
+    // Fallback: users still holding that month's total on their profile
+    // (only if they had no matched transactions — partial recovery)
+    const usersSnap = await getDocs(collection(db, "users"));
+    usersSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.role !== "user") return;
+      if (data.lastMonthUpdated !== monthLabel) return;
+      if (byStudent[docSnap.id]) return;
+      const pts = Number(data.currentMonthPoints) || 0;
+      if (pts <= 0) return;
+      byStudent[docSnap.id] = {
+        name: data.name || "Unknown",
+        score: pts,
+        materials: {},
+        fromProfileFallback: true,
+      };
+    });
+
+    let exportData = Object.values(byStudent).filter((u) => u.score > 0);
+    exportData.sort((a, b) => b.score - a.score);
+
+    if (!exportData.length) {
+      showToast(
+        `No weigh-ins found for ${monthLabel}. Check History dates, or data may not exist.`,
+        "error",
+      );
+      return;
+    }
+
+    const materialSet = new Set();
+    exportData.forEach((u) => {
+      Object.keys(u.materials || {}).forEach((m) => materialSet.add(m));
+    });
+    const materials = [...materialSet].sort();
+
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const niceMonth = `${monthNames[month - 1]} ${year}`;
+
+    let csvContent = `Report Type:,Past Month Leaderboard (from weigh-in history)\n`;
+    csvContent += `Period:,${niceMonth} (${monthLabel})\n`;
+    csvContent += `Transactions matched:,${matchedTx}\n`;
+    csvContent += `Generated On:,${new Date().toLocaleString()}\n\n`;
+    csvContent += `Rank,Student Name,${niceMonth} Points`;
+    materials.forEach((m) => {
+      csvContent += `,${m} (kg)`;
+    });
+    csvContent += `\n`;
+
+    let rank = 1;
+    exportData.forEach((user) => {
+      csvContent += `${rank},"${user.name}",${user.score}`;
+      materials.forEach((m) => {
+        csvContent += `,${(user.materials[m] || 0).toFixed(3)}`;
+      });
+      csvContent += `\n`;
+      rank++;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `CeriaPoints_Leaderboard_${monthLabel}.csv`,
+    );
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast(
+      `Downloaded ${exportData.length} students for ${niceMonth} (${matchedTx} weigh-ins).`,
+      "success",
+    );
+  } catch (error) {
+    console.error("Past month export error:", error);
+    showToast("Failed to export past month. Check console.", "error");
+  }
+};
+
 function calculateEnvironmentalImpact(userData) {
   let totalTrees = 0;
   let totalCO2 = 0;

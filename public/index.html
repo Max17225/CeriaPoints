@@ -1122,6 +1122,29 @@
           <div class="card" style="text-align: left">
             <h3 style="margin-top: 0; margin-bottom: 20px">Season & History</h3>
             <div class="security-form">
+              <h4 class="form-section-title">Export Past Month (CSV)</h4>
+              <p class="form-subtext" style="margin-bottom: 12px">
+                Rebuild a monthly leaderboard from weigh-in history (e.g. July
+                after the month has changed). Use this if you forgot to export
+                on time. Open the CSV in Excel and Print → PDF if you need a PDF.
+              </p>
+              <div class="admin-add-row" style="margin-top: 0">
+                <input
+                  type="month"
+                  id="pastMonthExportInput"
+                  value="2026-07"
+                  required
+                />
+                <button
+                  class="action-btn small-btn"
+                  style="margin-top: 0"
+                  onclick="exportPastMonthLeaderboardCSV()"
+                >
+                  Download July / Past Month CSV
+                </button>
+              </div>
+            </div>
+            <div class="security-form" style="margin-top: 20px">
               <h4 class="form-section-title">Annual Reset</h4>
               <p class="form-subtext" style="margin-bottom: 12px">
                 End the current year's season. This archives all current points
