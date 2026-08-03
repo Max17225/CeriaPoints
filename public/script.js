@@ -207,6 +207,8 @@ window.confirmLogout = function () {
 
     const exportBtn = document.getElementById("exportLeaderboardBtn");
     if (exportBtn) exportBtn.style.display = "none";
+    const pastBar = document.getElementById("pastMonthExportBar");
+    if (pastBar) pastBar.style.display = "none";
 
     if (meterUsageChart) {
       meterUsageChart.destroy();
@@ -297,6 +299,8 @@ function loadDashboard(userData) {
     if (document.getElementById("exportLeaderboardBtn"))
       document.getElementById("exportLeaderboardBtn").style.display =
         "inline-flex";
+    if (document.getElementById("pastMonthExportBar"))
+      document.getElementById("pastMonthExportBar").style.display = "inline-flex";
     switchRole("weigherPage");
   } else if (userData.role === "admin") {
     document.getElementById("navUser").style.display = "inline-block";
@@ -308,6 +312,8 @@ function loadDashboard(userData) {
     if (document.getElementById("exportLeaderboardBtn"))
       document.getElementById("exportLeaderboardBtn").style.display =
         "inline-flex";
+    if (document.getElementById("pastMonthExportBar"))
+      document.getElementById("pastMonthExportBar").style.display = "inline-flex";
     switchRole("adminPage");
   }
 }
@@ -706,11 +712,30 @@ window.fetchLeaderboard = async function () {
 };
 
 // --- EXPORT LEADERBOARD TO CSV ---
+function downloadCsvFile(filename, csvContent) {
+  // BOM helps Excel open UTF-8 correctly
+  const blob = new Blob(["\uFEFF" + csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  // Some mobile browsers need a short delay after async work
+  link.click();
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 250);
+}
+
 window.exportLeaderboardCSV = async function () {
   const filterDropdown = document.getElementById("leaderboardFilter");
   const filterMode = filterDropdown ? filterDropdown.value : "monthly";
 
-  showToast("Preparing export...", "info");
+  showToast("Preparing export...", "success");
 
   const d = new Date();
   const currentMonthStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
@@ -797,71 +822,153 @@ window.exportLeaderboardCSV = async function () {
       rank++;
     });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
     const safeDateForFile = `${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
+    downloadCsvFile(
       `CeriaPoints_${filterMode}_Leaderboard_${safeDateForFile}.csv`,
+      csvContent,
     );
-    link.style.display = "none";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 
     showToast("Download started!", "success");
   } catch (error) {
     console.error("Export Error: ", error);
-    showToast("Failed to generate export file.", "error");
+    const msg =
+      error.code === "permission-denied"
+        ? "Permission denied reading data for export."
+        : "Failed to generate export file.";
+    showToast(msg, "error");
   }
 };
 
-/** Parse transaction timestamp strings (locale varies by browser). */
-function parseTransactionDate(ts) {
-  if (!ts) return null;
+const MONTH_NAME_TO_INDEX = {
+  jan: 0,
+  january: 0,
+  januari: 0,
+  feb: 1,
+  february: 1,
+  februari: 1,
+  mar: 2,
+  march: 2,
+  mac: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  mei: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  julai: 6,
+  aug: 7,
+  august: 7,
+  ogos: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  okt: 9,
+  oktober: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+  dis: 11,
+  disember: 11,
+};
+
+/** Collect possible Date parses for mixed locale timestamps. */
+function parseTransactionDateCandidates(ts) {
+  const out = [];
+  if (!ts) return out;
+
   if (typeof ts.toDate === "function") {
     try {
-      return ts.toDate();
+      out.push(ts.toDate());
     } catch (_) {
       /* ignore */
     }
   }
-  if (ts instanceof Date && !isNaN(ts.getTime())) return ts;
+  if (ts instanceof Date && !isNaN(ts.getTime())) out.push(ts);
 
   const str = String(ts).trim();
-  const isoTry = new Date(str);
-  if (!isNaN(isoTry.getTime())) return isoTry;
+  const native = new Date(str);
+  if (!isNaN(native.getTime())) out.push(native);
 
-  // e.g. 18/07/2026 or 7/18/2026 (± time after)
-  const m = str.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
-  if (!m) return null;
-  const a = parseInt(m[1], 10);
-  const b = parseInt(m[2], 10);
-  const y = parseInt(m[3], 10);
-  if (a > 12) return new Date(y, b - 1, a); // D/M/Y
-  if (b > 12) return new Date(y, a - 1, b); // M/D/Y
-  // Ambiguous: prefer D/M/Y (Malaysia)
-  return new Date(y, b - 1, a);
+  const pushValid = (year, month0, day, hh = 12, mm = 0, ss = 0) => {
+    if (month0 < 0 || month0 > 11 || day < 1 || day > 31) return;
+    const d = new Date(year, month0, day, hh, mm, ss);
+    if (
+      d.getFullYear() === year &&
+      d.getMonth() === month0 &&
+      d.getDate() === day
+    ) {
+      out.push(d);
+    }
+  };
+
+  // Numeric: 18/07/2026 or 7/18/2026 (± optional time / AM|PM / pagi|petang)
+  const m = str.match(
+    /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[^\d]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm|pagi|petang|malam|pg|ptg)?)?/,
+  );
+  if (m) {
+    const a = parseInt(m[1], 10);
+    const b = parseInt(m[2], 10);
+    const y = parseInt(m[3], 10);
+    let hh = m[4] != null ? parseInt(m[4], 10) : 12;
+    const mm = m[5] != null ? parseInt(m[5], 10) : 0;
+    const ss = m[6] != null ? parseInt(m[6], 10) : 0;
+    const ap = (m[7] || "").toLowerCase();
+    if (ap === "pm" || ap === "petang" || ap === "malam" || ap === "ptg") {
+      if (hh < 12) hh += 12;
+    }
+    if ((ap === "am" || ap === "pagi" || ap === "pg") && hh === 12) hh = 0;
+    // Try both day/month orders (Malaysia D/M vs US M/D)
+    pushValid(y, b - 1, a, hh, mm, ss);
+    pushValid(y, a - 1, b, hh, mm, ss);
+  }
+
+  // Named months EN/MS: "18 July 2026", "18 Julai 2026", "July 18, 2026"
+  const named = str.match(
+    /(\d{1,2})\s+([A-Za-z]+)[.,]?\s+(\d{4})|[A-Za-z]+\s+(\d{1,2}),?\s+(\d{4})/,
+  );
+  if (named) {
+    if (named[1] && named[2] && named[3]) {
+      const day = parseInt(named[1], 10);
+      const mon = MONTH_NAME_TO_INDEX[named[2].toLowerCase()];
+      if (mon != null) pushValid(parseInt(named[3], 10), mon, day);
+    } else if (named[0]) {
+      const m2 = str.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+      if (m2) {
+        const mon = MONTH_NAME_TO_INDEX[m2[1].toLowerCase()];
+        if (mon != null)
+          pushValid(parseInt(m2[3], 10), mon, parseInt(m2[2], 10));
+      }
+    }
+  }
+
+  return out;
 }
 
-function isDateInYearMonth(dateObj, year, month1to12) {
-  if (!dateObj || isNaN(dateObj.getTime())) return false;
-  return (
-    dateObj.getFullYear() === year && dateObj.getMonth() + 1 === month1to12
+function transactionMatchesYearMonth(ts, year, month1to12) {
+  return parseTransactionDateCandidates(ts).some(
+    (d) =>
+      d &&
+      !isNaN(d.getTime()) &&
+      d.getFullYear() === year &&
+      d.getMonth() + 1 === month1to12,
   );
 }
 
 /**
- * Rebuild leaderboard for a past month from transactions
- * (normal export only does "this month").
+ * Rebuild leaderboard for a past month from transactions + profile leftover.
+ * (Normal export only does the live "this month".)
  */
 window.exportPastMonthLeaderboardCSV = async function () {
-  if (!activeUserData || activeUserData.role !== "admin") {
-    return showToast("Admin only.", "error");
+  if (
+    !activeUserData ||
+    (activeUserData.role !== "admin" && activeUserData.role !== "weigher")
+  ) {
+    return showToast("Admin or Weigher only.", "error");
   }
 
   const input = document.getElementById("pastMonthExportInput");
@@ -876,61 +983,73 @@ window.exportPastMonthLeaderboardCSV = async function () {
   }
 
   const monthLabel = ym; // 2026-07
-  showToast(`Building ${monthLabel} leaderboard from weigh-ins...`, "info");
+  showToast(`Building ${monthLabel} leaderboard...`, "success");
 
   try {
-    const txSnap = await getDocs(collection(db, "transactions"));
     const byStudent = {};
     let matchedTx = 0;
-    let skippedTx = 0;
+    let totalTx = 0;
 
-    txSnap.forEach((docSnap) => {
-      const data = docSnap.data();
-      const d = parseTransactionDate(data.timestamp);
-      if (!isDateInYearMonth(d, year, month)) {
-        skippedTx++;
-        return;
-      }
-      matchedTx++;
-      const id = data.studentId || data.studentName || docSnap.id;
-      if (!byStudent[id]) {
-        byStudent[id] = {
-          name: data.studentName || "Unknown",
-          score: 0,
-          materials: {},
-        };
-      }
-      byStudent[id].name = data.studentName || byStudent[id].name;
-      byStudent[id].score += Number(data.pointsAwarded) || 0;
-      const mat = data.material || "other";
-      byStudent[id].materials[mat] =
-        (byStudent[id].materials[mat] || 0) + (Number(data.weightKg) || 0);
-    });
-
-    // Fallback: users still holding that month's total on their profile
-    // (only if they had no matched transactions — partial recovery)
+    // 1) Profile leftovers: still tagged with that month (no August weigh-in yet)
     const usersSnap = await getDocs(collection(db, "users"));
     usersSnap.forEach((docSnap) => {
       const data = docSnap.data();
       if (data.role !== "user") return;
       if (data.lastMonthUpdated !== monthLabel) return;
-      if (byStudent[docSnap.id]) return;
       const pts = Number(data.currentMonthPoints) || 0;
       if (pts <= 0) return;
       byStudent[docSnap.id] = {
         name: data.name || "Unknown",
         score: pts,
         materials: {},
-        fromProfileFallback: true,
+        source: "profile",
       };
     });
+
+    // 2) Weigh-in history for that month (main recovery path)
+    let sampleTimestamps = [];
+    try {
+      const txSnap = await getDocs(collection(db, "transactions"));
+      totalTx = txSnap.size;
+      txSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (sampleTimestamps.length < 3) {
+          sampleTimestamps.push(String(data.timestamp || "(empty)"));
+        }
+        if (!transactionMatchesYearMonth(data.timestamp, year, month)) return;
+        matchedTx++;
+        const id = data.studentId || data.studentName || docSnap.id;
+        // Prefer transaction totals over leftover profile month points
+        if (!byStudent[id] || byStudent[id].source === "profile") {
+          byStudent[id] = {
+            name: data.studentName || byStudent[id]?.name || "Unknown",
+            score: 0,
+            materials: {},
+            source: "transactions",
+          };
+        }
+        byStudent[id].name = data.studentName || byStudent[id].name;
+        byStudent[id].score += Number(data.pointsAwarded) || 0;
+        const mat = data.material || "other";
+        byStudent[id].materials[mat] =
+          (byStudent[id].materials[mat] || 0) + (Number(data.weightKg) || 0);
+      });
+    } catch (txErr) {
+      console.warn("Could not read transactions (using profile only):", txErr);
+      if (!Object.keys(byStudent).length) {
+        throw txErr;
+      }
+    }
 
     let exportData = Object.values(byStudent).filter((u) => u.score > 0);
     exportData.sort((a, b) => b.score - a.score);
 
     if (!exportData.length) {
+      const sampleTs = sampleTimestamps.length
+        ? ` Sample dates: ${sampleTimestamps.join(" | ")}`
+        : "";
       showToast(
-        `No weigh-ins found for ${monthLabel}. Check History dates, or data may not exist.`,
+        `No data for ${monthLabel}. Found ${totalTx} total weigh-ins, 0 matched that month.${sampleTs}`,
         "error",
       );
       return;
@@ -958,9 +1077,10 @@ window.exportPastMonthLeaderboardCSV = async function () {
     ];
     const niceMonth = `${monthNames[month - 1]} ${year}`;
 
-    let csvContent = `Report Type:,Past Month Leaderboard (from weigh-in history)\n`;
+    let csvContent = `Report Type:,Past Month Leaderboard\n`;
     csvContent += `Period:,${niceMonth} (${monthLabel})\n`;
-    csvContent += `Transactions matched:,${matchedTx}\n`;
+    csvContent += `Weigh-ins matched:,${matchedTx}\n`;
+    csvContent += `Students listed:,${exportData.length}\n`;
     csvContent += `Generated On:,${new Date().toLocaleString()}\n\n`;
     csvContent += `Rank,Student Name,${niceMonth} Points`;
     materials.forEach((m) => {
@@ -970,7 +1090,7 @@ window.exportPastMonthLeaderboardCSV = async function () {
 
     let rank = 1;
     exportData.forEach((user) => {
-      csvContent += `${rank},"${user.name}",${user.score}`;
+      csvContent += `${rank},"${String(user.name).replace(/"/g, '""')}",${user.score}`;
       materials.forEach((m) => {
         csvContent += `,${(user.materials[m] || 0).toFixed(3)}`;
       });
@@ -978,26 +1098,19 @@ window.exportPastMonthLeaderboardCSV = async function () {
       rank++;
     });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `CeriaPoints_Leaderboard_${monthLabel}.csv`,
-    );
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsvFile(`CeriaPoints_Leaderboard_${monthLabel}.csv`, csvContent);
 
     showToast(
-      `Downloaded ${exportData.length} students for ${niceMonth} (${matchedTx} weigh-ins).`,
+      `Downloaded ${exportData.length} students (${matchedTx} weigh-ins in ${niceMonth}).`,
       "success",
     );
   } catch (error) {
     console.error("Past month export error:", error);
-    showToast("Failed to export past month. Check console.", "error");
+    const msg =
+      error.code === "permission-denied"
+        ? "Permission denied. Only Admin/Weigher can export, and transactions must be readable."
+        : error.message || "Failed to export past month.";
+    showToast(msg, "error");
   }
 };
 

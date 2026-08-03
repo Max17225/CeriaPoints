@@ -670,6 +670,38 @@
                   </svg>
                   Export CSV
                 </button>
+                <span
+                  id="pastMonthExportBar"
+                  style="
+                    display: none;
+                    align-items: center;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <input
+                    type="month"
+                    id="pastMonthExportInput"
+                    value="2026-07"
+                    title="Month to rebuild from weigh-ins"
+                    style="
+                      padding: 5px 8px;
+                      border-radius: 12px;
+                      border: 2px solid var(--primary-color);
+                      font-weight: 600;
+                      color: var(--primary-color);
+                      background: #f0f5ff;
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="action-btn small-btn"
+                    style="margin: 0; padding: 6px 12px"
+                    onclick="exportPastMonthLeaderboardCSV()"
+                  >
+                    Export Past Month
+                  </button>
+                </span>
               </div>
             </div>
 
@@ -1124,25 +1156,18 @@
             <div class="security-form">
               <h4 class="form-section-title">Export Past Month (CSV)</h4>
               <p class="form-subtext" style="margin-bottom: 12px">
-                Rebuild a monthly leaderboard from weigh-in history (e.g. July
-                after the month has changed). Use this if you forgot to export
-                on time. Open the CSV in Excel and Print → PDF if you need a PDF.
+                On the <strong>Leaderboard</strong> tab, pick a month and click
+                <strong>Export Past Month</strong> (rebuilds totals from weigh-in
+                history — use this for July after the month rolls over). Open the
+                CSV in Excel → Print → PDF if you need a PDF.
               </p>
-              <div class="admin-add-row" style="margin-top: 0">
-                <input
-                  type="month"
-                  id="pastMonthExportInput"
-                  value="2026-07"
-                  required
-                />
-                <button
-                  class="action-btn small-btn"
-                  style="margin-top: 0"
-                  onclick="exportPastMonthLeaderboardCSV()"
-                >
-                  Download July / Past Month CSV
-                </button>
-              </div>
+              <button
+                type="button"
+                class="action-btn small-btn"
+                onclick="exportPastMonthLeaderboardCSV()"
+              >
+                Download Past Month CSV
+              </button>
             </div>
             <div class="security-form" style="margin-top: 20px">
               <h4 class="form-section-title">Annual Reset</h4>
